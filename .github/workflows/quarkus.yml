@@ -1,0 +1,348 @@
+name: Quarkus tests
+
+on: [push]
+
+env:
+  # Workaround testsuite locale issue
+  LANG: en_US.UTF-8
+  DB_USER: hibernate_orm_test
+  DB_PASSWORD: hibernate_orm_test
+  DB_NAME: hibernate_orm_test
+  NATIVE_TEST_MAVEN_OPTS: "-B -Dtest-postgresql -Dtest-elasticsearch -Dtest-keycloak -Dtest-dynamodb -Dtest-mysql -Dtest-mariadb -Dmariadb.url='jdbc:mariadb://localhost:3308/hibernate_orm_test'  -Dtest-mssql -Dtest-vault -Dtest-neo4j -Dnative-image.xmx=5g -Dnative -Dformat.skip install"
+  MX_GIT_CACHE: refcache
+  JAVA_HOME: ${{ github.workspace }}/openjdk
+
+jobs:
+  build-mandrel:
+    name: Mandrel build
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+        path: mandrel
+    - uses: actions/checkout@v1
+      with:
+        repository: graalvm/mx.git
+        ref: master
+        path: mx
+    - uses: actions/cache@v1
+      with:
+        path: ~/.mx
+        key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
+        restore-keys: |
+          ${{ runner.os }}-mx-
+    - name: Get openJDK11 with static libs
+      run: |
+        curl -sL https://github.com/AdoptOpenJDK/openjdk11-upstream-binaries/releases/download/jdk-11.0.8%2B4/OpenJDK11U-jdk_x64_linux_11.0.8_4_ea.tar.gz -o jdk.tar.gz
+        curl -sL https://github.com/AdoptOpenJDK/openjdk11-upstream-binaries/releases/download/jdk-11.0.8%2B4/OpenJDK11U-static-libs_x64_linux_11.0.8_4_ea.tar.gz -o jdk-static-libs.tar.gz
+        mkdir -p ${JAVA_HOME}
+        tar xf jdk.tar.gz -C ${JAVA_HOME} --strip-components=1
+        tar xf jdk-static-libs.tar.gz -C ${JAVA_HOME} --strip-components=1
+        echo ${JAVA_HOME}
+        ${JAVA_HOME}/bin/java --version
+    - name: Build mandrel native-image
+      run: |
+        cd substratevm
+        ../../mx/mx --components="Native Image" build
+        mv $(../../mx/mx --components="Native Image" graalvm-home) ~/mandreljdk
+        ~/mandreljdk/bin/native-image --version
+    - name: Tar mandrelJDK
+      shell: bash
+      run: tar -czvf mandreljdk.tgz -C ~ mandreljdk
+    - name: Persist Mandrel build
+      uses: actions/upload-artifact@v1
+      with:
+        name: mandreljdk
+        path: mandreljdk.tgz
+
+  build-quarkus:
+    name: Quarkus build
+    runs-on: ubuntu-18.04
+    needs: build-mandrel
+    strategy:
+      matrix:
+        category: [quarkus-release, quarkus-master]
+        include:
+          - category: quarkus-release
+            quarkus-url: $(curl -sL https://api.github.com/repos/quarkusio/quarkus/releases/latest | jq -r .tarball_url)
+            quarkus-name: release
+          - category: quarkus-master
+            quarkus-url: https://api.github.com/repos/quarkusio/quarkus/tarball/master
+            quarkus-name: master
+    steps:
+    - name: Get quarkus
+      run: |
+        curl --output quarkus.tgz -sL ${{ matrix.quarkus-url }}
+        mkdir ${GITHUB_WORKSPACE}/quarkus
+        tar xf quarkus.tgz -C ${GITHUB_WORKSPACE}/quarkus --strip-components=1
+    - uses: actions/cache@v1
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-${{ matrix.quarkus-name }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.quarkus-name }}-maven-
+    - name: Download Mandrel build
+      uses: actions/download-artifact@v1
+      with:
+        name: mandreljdk
+        path: .
+    - name: Extract Mandrel build
+      shell: bash
+      run: tar -xzvf mandreljdk.tgz -C ~
+    - name: Build quarkus
+      run: |
+        export JAVA_HOME=~/mandreljdk
+        cd ${GITHUB_WORKSPACE}/quarkus
+        eval ./mvnw -e -B -DskipTests -DskipDocs clean install
+    - name: Tar Quarkus
+      shell: bash
+      run: tar -czvf quarkus-${{ matrix.quarkus-name }}.tgz -C ${GITHUB_WORKSPACE}/ quarkus
+    - name: Persist Quarkus
+      uses: actions/upload-artifact@v1
+      with:
+        name: quarkus-${{ matrix.quarkus-name }}
+        path: quarkus-${{ matrix.quarkus-name }}.tgz
+    - name: Tar Maven Repo
+      shell: bash
+      run: tar -czvf maven-repo-${{ matrix.quarkus-name }}.tgz -C ~ .m2/repository
+    - name: Persist Maven Repo
+      uses: actions/upload-artifact@v1
+      with:
+        name: maven-repo-${{ matrix.quarkus-name }}
+        path: maven-repo-${{ matrix.quarkus-name }}.tgz
+
+  native-tests:
+    name: Native Tests - ${{matrix.category}}
+    needs:
+      - build-mandrel
+      - build-quarkus
+    runs-on: ubuntu-18.04
+    # Ignore the following YAML Schema error
+    timeout-minutes: ${{matrix.timeout}}
+    strategy:
+      fail-fast: false
+      matrix:
+        quarkus-name: [release, master]
+        category: [Main, Data1, Data2, Data3, Data4, Data5, Security1, Security2, Amazon, Messaging, Cache, HTTP, Misc1, Misc2, Misc3, Spring]
+        include:
+          - category: Main
+            postgres: "true"
+            timeout: 30
+            test-modules: main
+          - category: Data1
+            mariadb: "true"
+            mssql: "true"
+            timeout: 50
+            test-modules: >
+              jpa-h2
+              jpa-mariadb
+              jpa-mssql
+              jpa-derby
+              jpa-without-entity
+          - category: Data2
+            mysql: "true"
+            postgres: "true"
+            timeout: 30
+            test-modules: >
+              jpa
+              jpa-postgresql
+              jpa-mysql
+              reactive-mysql-client
+          - category: Data3
+            postgres: "true"
+            timeout: 40
+            test-modules: >
+              flyway
+              hibernate-orm-panache
+              reactive-pg-client
+              liquibase
+          - category: Data4
+            neo4j: "true"
+            timeout: 30
+            test-modules: >
+              mongodb-client
+              mongodb-panache
+              neo4j
+          - category: Data5
+            timeout: 30
+            test-modules: >
+              hibernate-search-elasticsearch
+              narayana-stm
+              narayana-jta
+          - category: Amazon
+            dynamodb: "true"
+            timeout: 20
+            test-modules: >
+              amazon-dynamodb
+              amazon-lambda
+              amazon-lambda-http
+          - category: Messaging
+            timeout: 65
+            test-modules: >
+              artemis-core
+              artemis-jms
+              kafka
+              kafka-streams
+              reactive-messaging-amqp
+          - category: Security1
+            timeout: 40
+            keycloak: "true"
+            test-modules: >
+              elytron-security-oauth2
+              elytron-security
+              elytron-security-jdbc
+              elytron-undertow
+              elytron-security-ldap
+          - category: Security2
+            timeout: 60
+            keycloak: "true"
+            test-modules: >
+              elytron-resteasy
+              oidc
+              oidc-code-flow
+              oidc-tenancy
+              vault-app
+              keycloak-authorization
+          - category: Cache
+            timeout: 30
+            test-modules: >
+              infinispan-cache-jpa
+              infinispan-client
+              infinispan-embedded
+              cache
+          - category: HTTP
+            timeout: 35
+            test-modules: >
+              resteasy-jackson
+              resteasy-mutiny
+              vertx
+              vertx-http
+              vertx-graphql
+              virtual-http
+          - category: Misc1
+            timeout: 40
+            test-modules: >
+              maven
+              jackson
+              jsonb
+              jsch
+              jgit
+              quartz
+              qute
+          - category: Misc2
+            timeout: 40
+            test-modules: >
+              tika
+              hibernate-validator
+              test-extension
+              logging-gelf
+              bootstrap-config
+              optaplanner-jackson
+              optaplanner-jsonb
+          # kubernetes-client alone takes 30mn+
+          - category: Misc3
+            timeout: 50
+            test-modules: >
+              kubernetes-client
+          - category: Spring
+            timeout: 30
+            test-modules: >
+              spring-di
+              spring-web
+              spring-data-jpa
+              spring-boot-properties
+              spring-cloud-config-client
+    steps:
+      # These should be services, but services do not (yet) allow conditional execution
+      - name: Postgres Service
+        run: |
+          docker run --rm --publish 5432:5432 --name build-postgres \
+          -e POSTGRES_USER=$DB_USER -e POSTGRES_PASSWORD=$DB_PASSWORD -e POSTGRES_DB=$DB_NAME \
+          -d postgres:10.5
+        if: matrix.postgres
+      - name: MySQL Service
+        run: |
+          sudo service mysql stop || true
+          docker run --rm --publish 3306:3306 --name build-mysql  \
+            -e MYSQL_USER=$DB_USER -e MYSQL_PASSWORD=$DB_PASSWORD -e MYSQL_DATABASE=$DB_NAME -e MYSQL_RANDOM_ROOT_PASSWORD=true \
+            -d mysql:5 --skip-ssl
+        if: matrix.mysql
+      - name: Maria DB Service
+        run: |
+          docker run --rm --publish 3308:3306 --name build-mariadb \
+            -e MYSQL_USER=$DB_USER -e MYSQL_PASSWORD=$DB_PASSWORD -e MYSQL_DATABASE=$DB_NAME -e MYSQL_RANDOM_ROOT_PASSWORD=true \
+            -d mariadb:10.4
+        if: matrix.mariadb
+      - name: MS-SQL Service
+        run: |
+          docker run --rm --publish 1433:1433 --name build-mssql \
+            -e ACCEPT_EULA=Y -e SA_PASSWORD=ActuallyRequired11Complexity \
+            -d microsoft/mssql-server-linux:2017-CU12
+        if: matrix.mssql
+      - name: Dynamo DB Service
+        run: |
+          docker run --rm --publish 8000:8000 --name build-dynamodb \
+            -d amazon/dynamodb-local:1.11.477
+        if: matrix.dynamodb
+      - name: Neo4j Service
+        run: |
+          docker run --rm --publish 7687:7687 --name build-neo4j \
+            -e NEO4J_AUTH=neo4j/secret -e NEO4J_dbms_memory_pagecache_size=10M -e NEO4J_dbms_memory_heap_initial__size=10M \
+            -d neo4j/neo4j-experimental:4.0.0-rc01
+        if: matrix.neo4j
+      - name: Keycloak Service
+        run: |
+          docker run --rm --publish 8180:8080 --publish 8543:8443 --name build-keycloak \
+            -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin -e JAVA_OPTS=" \
+              -server -Xms64m -Xmx512m -XX:MetaspaceSize=96M \
+              -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true -Djava.awt.headless=true \
+              -Dkeycloak.profile.feature.upload_scripts=enabled" \
+            -d quay.io/keycloak/keycloak:10.0.0
+        if: matrix.keycloak
+      - name: Download Maven Repo
+        uses: actions/download-artifact@v1
+        with:
+          name: maven-repo-${{ matrix.quarkus-name }}
+          path: .
+      - name: Extract Maven Repo
+        shell: bash
+        run: tar -xzvf maven-repo-${{ matrix.quarkus-name }}.tgz -C ~
+      - name: Download Mandrel build
+        uses: actions/download-artifact@v1
+        with:
+          name: mandreljdk
+          path: .
+      - name: Extract Mandrel build
+        shell: bash
+        run: tar -xzvf mandreljdk.tgz -C ~
+      - name: Download Quarkus
+        uses: actions/download-artifact@v1
+        with:
+          name: quarkus-${{ matrix.quarkus-name }}
+          path: .
+      - name: Extract Quarkus
+        shell: bash
+        run: tar -xzvf quarkus-${{ matrix.quarkus-name }}.tgz -C ~
+      - name: Build with Maven
+        env:
+          TEST_MODULES: ${{matrix.test-modules}}
+        run: |
+          cd ~/quarkus
+          export JAVA_HOME=~/mandreljdk
+          export GRAALVM_HOME=~/mandreljdk
+          ${GRAALVM_HOME}/bin/native-image --version
+          for i in $TEST_MODULES
+          do modules+=("integration-tests/$i"); done
+          IFS=,
+          eval ./mvnw -pl "${modules[*]}" $NATIVE_TEST_MAVEN_OPTS
+      - name: Prepare failure archive (if maven failed)
+        if: failure()
+        shell: bash
+        run: find . -name '*-reports' -type d | tar -czvf test-reports.tgz -T -
+      - name: Upload failure Archive (if maven failed)
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: test-reports-native-${{matrix.category}}
+          path: 'test-reports.tgz'
