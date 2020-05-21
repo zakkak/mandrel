@@ -801,9 +801,14 @@ def gen_fallbacks():
         else:
             mx.abort('gen_fallbacks not supported on ' + sys.platform)
 
-        staticlib_wildcard = ['lib', mx_subst.path_substitutions.substitute('<staticlib:*>')]
         if svm_java8():
-            staticlib_wildcard[0:0] = ['jre']
+            staticlib_path = ['jre', 'lib']
+        else:
+            staticlib_path = ['lib', 'static', mx.get_os() + '-' + mx.get_arch()]
+            if mx.is_linux():
+                # Assume we are running under glibc by default for now.
+                staticlib_path = staticlib_path + ['glibc']
+        staticlib_wildcard = staticlib_path + [mx_subst.path_substitutions.substitute('<staticlib:*>')]
         staticlib_wildcard_path = join(mx_compiler.jdk.home, *staticlib_wildcard)
         for staticlib_path in glob(staticlib_wildcard_path):
             mx.logv('Collect from : ' + staticlib_path)
@@ -1256,9 +1261,15 @@ mx_sdk_vm.register_graalvm_component(mx_sdk_vm.GraalVmJreComponent(
     ],
 ))
 
-is_musl_building_supported = mx.is_linux() and mx.get_arch() == "amd64" and mx.get_jdk(tag='default').javaCompliance == '11'
+def is_musl_building_supported():
+    jdk = mx.get_jdk(tag='default')
+    if mx.is_linux() and mx.get_arch() == "amd64" and mx.get_jdk(tag='default').javaCompliance == '11':
+        musl_library_path = join(jdk.home, 'lib', 'static', 'linux-amd64', 'musl')
+        return exists(musl_library_path)
+    return False
 
-if is_musl_building_supported:
+
+if is_musl_building_supported():
     mx_sdk_vm.register_graalvm_component(mx_sdk_vm.GraalVMSvmStaticLib(
         suite=suite,
         name='JDK11 static libraries compiled with muslc',
