@@ -4,7 +4,8 @@ on:
   push:
     branches:
     - master
-    - 20.1
+    paths:
+    - .github/workflows/**
   schedule:
   - cron: '*/15 * * * *'
 
