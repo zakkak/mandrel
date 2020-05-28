@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,10 +22,32 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package org.graalvm.compiler.replacements.arraycopy;
+package org.graalvm.compiler.core.test;
 
-import org.graalvm.compiler.core.common.spi.ForeignCallsProvider;
+import static org.graalvm.compiler.api.directives.GraalDirectives.injectBranchProbability;
 
-public interface ArrayCopyForeignCalls extends ForeignCallsProvider, ArrayCopyLookup {
+import org.junit.Test;
 
+/**
+ * Test extracted from reproducer in https://github.com/oracle/graal/issues/2493.
+ */
+public class IfCanonicalizerSwapTest extends GraalCompilerTest {
+    public static String testSnippet1(long value) {
+        if (injectBranchProbability(0.50, value >= 0L) && injectBranchProbability(0.00, value <= 35L)) {
+            return "JustRight";
+        } else {
+            if (injectBranchProbability(0.50, value > 35L)) {
+                return "TooHot";
+            } else {
+                return "TooCold";
+            }
+        }
+    }
+
+    @Test
+    public void test1() {
+        test("testSnippet1", -1L);
+        test("testSnippet1", 100L);
+        test("testSnippet1", 10L);
+    }
 }
