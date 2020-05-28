@@ -282,13 +282,16 @@ public final class NativeLibraries {
     private static Path getPlatformDependentJDKStaticLibraryPath() throws IOException {
         Path baseSearchPath = Paths.get(System.getProperty("java.home")).resolve("lib").toRealPath();
         if (JavaVersionUtil.JAVA_SPEC > 8) {
-            baseSearchPath = baseSearchPath.resolve("static");
+            Path staticLibPath = baseSearchPath.resolve("static");
             SubstrateTargetDescription target = ConfigurationValues.getTarget();
-            Path platformDependentPath = baseSearchPath.resolve((OS.getCurrent().className + "-" + target.arch.getName()).toLowerCase());
+            Path platformDependentPath = staticLibPath.resolve((OS.getCurrent().className + "-" + target.arch.getName()).toLowerCase());
             if (OS.getCurrent() == OS.LINUX) {
                 platformDependentPath = platformDependentPath.resolve(LibCBase.singleton().getName());
             }
-            return platformDependentPath;
+            // Fallback for older JDK versions
+            if (Files.exists(platformDependentPath)) {
+                return platformDependentPath;
+            }
         }
         return baseSearchPath;
     }
