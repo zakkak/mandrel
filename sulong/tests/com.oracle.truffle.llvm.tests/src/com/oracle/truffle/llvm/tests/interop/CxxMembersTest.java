@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2019, Oracle and/or its affiliates.
+ * Copyright (c) 2020, Oracle and/or its affiliates.
  *
  * All rights reserved.
  *
@@ -27,41 +27,35 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.oracle.truffle.llvm.tests.interop;
 
-/* The corresponding bitcode file was produced with:
- * clang -Wall -Wextra -mavx2 -mavx -fvectorize -O1 -c -emit-llvm gep-vec.c
-*/
+import org.graalvm.polyglot.Value;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
-void doloop(float *a[512], float b[512], int c[512], int d[512]) {
-  for (int i = 0; i < 512 / 4; ++i) {
-    #pragma clang loop vectorize(enable)
-    for (int j = 0; j < 4; ++j) {
-      a[(i*4)+j] = &b[(i*4)+j] + c[(i*4)+j] * d[(i*4)+j];
+import com.oracle.truffle.tck.TruffleRunner;
+
+@RunWith(TruffleRunner.class)
+public class CxxMembersTest extends InteropTestBase {
+
+    private static Value testCppLibrary;
+
+    @BeforeClass
+    public static void loadTestBitcode() {
+        testCppLibrary = loadTestBitcodeValue("membersTest.cpp");
     }
-  }
-}
 
-void init(int c[512], int d[512]) {
-  for (int i = 0; i < 512; i++){
-    c[i] = i;
-    d[i] = i + 512;
-  }
-}
-
-int main() {
-  float *a[512];
-  float b[512];
-  int c[512] = {0};
-  int d[512] = {0};
-
-  init(c, d);
-  doloop(a, b, c, d);
-
-  for (int i = 0; i < 512; ++i) {
-    if (a[i] != &b[i] + c[i] * d[i]) {
-      return 1;
+    @Test
+    public void testMemberExists() {
+        Assert.assertTrue(testCppLibrary.hasMember("hello"));
+        Assert.assertTrue(testCppLibrary.hasMember("bye"));
+        Assert.assertTrue(testCppLibrary.hasMember("gcd"));
     }
-  }
 
-  return 0;
+    @Test
+    public void testMemberDoesNotExist() {
+        Assert.assertFalse(testCppLibrary.hasMember("abc"));
+    }
 }
