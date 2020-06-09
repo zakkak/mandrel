@@ -58,28 +58,3 @@ jobs:
         git remote add upstream https://github.com/oracle/graal
         git pull --quiet upstream release/graal-vm/20.1
         git push --quiet origin oracle-20.1
-
-  mandrel-20-1:
-    needs: oracle-20-1
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout 20.1 branch
-      uses: actions/checkout@v2
-      with:
-        ref: 20.1
-        fetch-depth: 0
-    - name: Sync 20.1 branch
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git fetch origin oracle-20.1
-        git merge origin/oracle-20.1
-    - name: Create Pull Request
-      id: cpr
-      uses: peter-evans/create-pull-request@v2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        commit-message: Sync with upstream
-        title: '[Sync] 20.1 with upstream'
-        labels: sync, automated pr
-        branch: auto-sync-20.1
