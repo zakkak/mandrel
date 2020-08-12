@@ -1,0 +1,28 @@
+name: Repo Sync
+
+on:
+  push:
+    branches:
+    - master
+    paths:
+    - .github/workflows/**
+  schedule:
+  - cron: '0 4 * * *'
+
+jobs:
+  mandrel-master:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout graal/master branch
+      uses: actions/checkout@v2
+      with:
+        ref: graal/master
+        fetch-depth: 0
+    - name: Sync branch
+      run: |
+        git config --local user.email "fzakkak@redhat.com"
+        git config --local user.name "Foivos Zakkak through GH action"
+        git remote add upstream https://github.com/oracle/graal
+        git fetch upstream master
+        git merge upstream/master
+        git push --quiet origin graal/master
