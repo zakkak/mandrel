@@ -26,58 +26,32 @@
 
 package com.oracle.objectfile.debugentry;
 
-import java.nio.file.Path;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugArrayTypeInfo;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind;
+import org.graalvm.compiler.debug.DebugContext;
 
-/**
- * Tracks debug info associated with a Java source file.
- */
-public class FileEntry {
-    private String fileName;
-    private DirEntry dirEntry;
-    private Path cachePath;
+public class ArrayTypeEntry extends TypeEntry {
+    private TypeEntry elementType;
+    private int headerSize;
+    private int lengthOffset;
 
-    public FileEntry(String fileName, DirEntry dirEntry, Path cachePath) {
-        this.fileName = fileName;
-        this.dirEntry = dirEntry;
-        this.cachePath = cachePath;
-    }
-
-    /**
-     * The name of the associated file excluding path elements.
-     */
-    public String getFileName() {
-        return fileName;
-    }
-
-    public String getPathName() {
-        return getDirEntry().getPathString();
-    }
-
-    public String getFullName() {
-        return getDirEntry() != null ? getDirEntry().getPath().resolve(getFileName()).toString() : getFileName();
-    }
-
-    /**
-     * The directory entry associated with this file entry.
-     */
-    public DirEntry getDirEntry() {
-        return dirEntry;
-    }
-
-    /**
-     * The compilation directory in which to look for source files as a {@link String}.
-     */
-    public Path getCachePath() {
-        return cachePath;
+    public ArrayTypeEntry(String typeName, int size) {
+        super(typeName, size);
     }
 
     @Override
-    public String toString() {
-        if (getDirEntry() == null) {
-            return getFileName() == null ? "-" : getFileName();
-        } else if (getFileName() == null) {
-            return "--";
-        }
-        return String.format("FileEntry(%s)", getFullName());
+    public DebugTypeKind typeKind() {
+        return DebugTypeKind.PRIMITIVE;
+    }
+
+    @Override
+    public void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext) {
+        DebugArrayTypeInfo debugArrayTypeInfo = (DebugArrayTypeInfo) debugTypeInfo;
+        String elementTypeName = TypeEntry.canonicalize(debugArrayTypeInfo.elementType());
+        elementType = debugInfoBase.lookupTypeEntry(elementTypeName);
+        this.headerSize = debugArrayTypeInfo.headerSize();
+        this.lengthOffset = debugArrayTypeInfo.lengthOffset();
+        debugContext.log("typename %s element type %s header size %d length offset %d\n", typeName, elementTypeName, headerSize, lengthOffset);
     }
 }

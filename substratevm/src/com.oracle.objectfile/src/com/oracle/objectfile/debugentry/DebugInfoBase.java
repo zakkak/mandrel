@@ -32,6 +32,7 @@ import org.graalvm.compiler.debug.DebugContext;
 
 import java.nio.ByteOrder;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -87,6 +88,14 @@ public abstract class DebugInfoBase {
     /**
      * List of class entries detailing class info for primary ranges.
      */
+    private LinkedList<TypeEntry> types = new LinkedList<>();
+    /**
+     * index of already seen classes.
+     */
+    private Map<String, TypeEntry> typesIndex = new HashMap<>();
+    /**
+     * List of class entries detailing class info for primary ranges.
+     */
     private LinkedList<ClassEntry> primaryClasses = new LinkedList<>();
     /**
      * index of already seen classes.
@@ -124,11 +133,27 @@ public abstract class DebugInfoBase {
          */
         stringTable.uniqueDebugString("");
 
+        // create all the types
         debugInfoProvider.typeInfoProvider().forEach(debugTypeInfo -> debugTypeInfo.debugContext((debugContext) -> {
-            String typeName = debugTypeInfo.typeName().replaceAll("\\$", ".");
+            String typeName = TypeEntry.canonicalize(debugTypeInfo.typeName());
+            DebugTypeKind typeKind = debugTypeInfo.typeKind();
+            int byteSize = debugTypeInfo.size();
+
+            debugContext.log(DebugContext.INFO_LEVEL, "Register %s type %s ", typeKind.toString(), typeName);
+            String fileName = debugTypeInfo.fileName();
+            Path filePath = debugTypeInfo.filePath();
+            Path cachePath = debugTypeInfo.cachePath();
+            addTypeEntry(typeName, fileName, filePath, cachePath, byteSize, typeKind);
+        }));
+
+        // now we can cross reference static and instance field details
+        debugInfoProvider.typeInfoProvider().forEach(debugTypeInfo -> debugTypeInfo.debugContext((debugContext) -> {
+            String typeName = TypeEntry.canonicalize(debugTypeInfo.typeName());
             DebugTypeKind typeKind = debugTypeInfo.typeKind();
 
-            debugContext.log(DebugContext.INFO_LEVEL, "%s type %s ", typeKind.toString(), typeName);
+            debugContext.log(DebugContext.INFO_LEVEL, "Process %s type %s ", typeKind.toString(), typeName);
+            TypeEntry typeEntry = lookupTypeEntry(typeName);
+            typeEntry.addDebugInfo(this, debugTypeInfo, debugContext);
         }));
 
         debugInfoProvider.codeInfoProvider().forEach(debugCodeInfo -> debugCodeInfo.debugContext((debugContext) -> {
@@ -138,12 +163,11 @@ public abstract class DebugInfoBase {
             String fileName = debugCodeInfo.fileName();
             Path filePath = debugCodeInfo.filePath();
             Path cachePath = debugCodeInfo.cachePath();
-            // switch '$' in class names for '.'
-            String className = debugCodeInfo.className().replaceAll("\\$", ".");
+            String className = TypeEntry.canonicalize(debugCodeInfo.className());
             String methodName = debugCodeInfo.methodName();
             String symbolName = debugCodeInfo.symbolNameForMethod();
             String paramNames = debugCodeInfo.paramNames();
-            String returnTypeName = debugCodeInfo.returnTypeName();
+            String returnTypeName = TypeEntry.canonicalize(debugCodeInfo.returnTypeName());
             int lo = debugCodeInfo.addressLo();
             int hi = debugCodeInfo.addressHi();
             int primaryLine = debugCodeInfo.line();
@@ -155,8 +179,7 @@ public abstract class DebugInfoBase {
             debugCodeInfo.lineInfoProvider().forEach(debugLineInfo -> {
                 String fileNameAtLine = debugLineInfo.fileName();
                 Path filePathAtLine = debugLineInfo.filePath();
-                // Switch '$' in class names for '.'
-                String classNameAtLine = debugLineInfo.className().replaceAll("\\$", ".");
+                String classNameAtLine = TypeEntry.canonicalize(debugLineInfo.className());
                 String methodNameAtLine = debugLineInfo.methodName();
                 String symbolNameAtLine = debugLineInfo.symbolNameForMethod();
                 int loAtLine = lo + debugLineInfo.addressLo();
@@ -184,6 +207,68 @@ public abstract class DebugInfoBase {
          */
     }
 
+    private TypeEntry createTypeEntry(String typeName, String fileName, Path filePath, Path cachePath, int size, DebugTypeKind typeKind) {
+        TypeEntry typeEntry = null;
+        switch (typeKind) {
+            case INSTANCE: {
+                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                typeEntry = new ClassEntry(typeName, fileEntry, size);
+                break;
+            }
+            case INTERFACE: {
+                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                typeEntry = new InterfaceClassEntry(typeName, fileEntry, size);
+                break;
+            }
+            case ENUM: {
+                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                typeEntry = new EnumClassEntry(typeName, fileEntry, size);
+                break;
+            }
+            case PRIMITIVE:
+                assert fileName.length() == 0;
+                assert filePath == null;
+                typeEntry = new PrimitiveTypeEntry(typeName, size);
+                break;
+            case ARRAY:
+                assert fileName.length() == 0;
+                assert filePath == null;
+                typeEntry = new ArrayTypeEntry(typeName, size);
+                break;
+        }
+        return typeEntry;
+    }
+
+    private TypeEntry addTypeEntry(String typeName, String fileName, Path filePath, Path cachePath, int size, DebugTypeKind typeKind) {
+        TypeEntry typeEntry = typesIndex.get(typeName);
+        if (typeEntry == null) {
+            typeEntry = createTypeEntry(typeName, fileName, filePath, cachePath, size, typeKind);
+            types.add(typeEntry);
+            typesIndex.put(typeName, typeEntry);
+        } else {
+            if (!(typeEntry.isClass())) {
+                assert ((ClassEntry) typeEntry).getFileName().equals(fileName);
+            }
+        }
+        return typeEntry;
+    }
+
+    TypeEntry lookupTypeEntry(String typeName) {
+        TypeEntry typeEntry = typesIndex.get(typeName);
+        if (typeEntry == null) {
+            throw new RuntimeException("type entry not found " + typeName);
+        }
+        return typeEntry;
+    }
+
+    ClassEntry lookupClassEntry(String typeName) {
+        TypeEntry typeEntry = typesIndex.get(typeName);
+        if (typeEntry == null || !(typeEntry.isClass())) {
+            throw new RuntimeException("class entry not found " + typeName);
+        }
+        return (ClassEntry) typeEntry;
+    }
+
     private ClassEntry ensureClassEntry(Range range) {
         String className = range.getClassName();
         /*
@@ -191,16 +276,39 @@ public abstract class DebugInfoBase {
          */
         ClassEntry classEntry = primaryClassesIndex.get(className);
         if (classEntry == null) {
-            /*
-             * Create and index the entry associating it with the right file.
-             */
-            FileEntry fileEntry = ensureFileEntry(range);
-            classEntry = new ClassEntry(className, fileEntry);
+            TypeEntry typeEntry = typesIndex.get(className);
+            assert (typeEntry != null && typeEntry.isClass());
+            classEntry = (ClassEntry) typeEntry;
             primaryClasses.add(classEntry);
             primaryClassesIndex.put(className, classEntry);
         }
-        assert classEntry.getClassName().equals(className);
+        assert (classEntry.getFileName().equals(range.getFileName()));
+        assert (classEntry.getTypeName().equals(className));
         return classEntry;
+    }
+
+    private FileEntry addFileEntry(String typeName, String fileName, Path filePath, Path cachePath) {
+        assert fileName != null;
+        Path fileAsPath;
+        if (filePath != null) {
+            fileAsPath = filePath.resolve(fileName);
+        } else {
+            fileAsPath = Paths.get(fileName);
+        }
+        FileEntry fileEntry = filesIndex.get(fileAsPath);
+        if (fileEntry == null) {
+            DirEntry dirEntry = ensureDirEntry(filePath);
+            fileEntry = new FileEntry(fileName, dirEntry, cachePath);
+            files.add(fileEntry);
+            /*
+             * Index the file entry by file path.
+             */
+            filesIndex.put(fileAsPath, fileEntry);
+        } else {
+            assert (filePath == null ||
+                            fileEntry.getDirEntry().getPath().equals(filePath));
+        }
+        return fileEntry;
     }
 
     private FileEntry ensureFileEntry(Range range) {
@@ -208,26 +316,24 @@ public abstract class DebugInfoBase {
         if (fileName == null) {
             return null;
         }
-        Path filePath = range.getFilePath();
         Path fileAsPath = range.getFileAsPath();
         /*
          * Ensure we have an entry.
          */
-        FileEntry fileEntry = filesIndex.get(fileAsPath);
-        if (fileEntry == null) {
-            DirEntry dirEntry = ensureDirEntry(filePath);
-            fileEntry = new FileEntry(fileName, dirEntry, range.getCachePath());
-            files.add(fileEntry);
-            /*
-             * Index the file entry by file path.
-             */
-            filesIndex.put(fileAsPath, fileEntry);
-            if (!range.isPrimary()) {
-                /* Check we have a file for the corresponding primary range. */
-                Range primaryRange = range.getPrimary();
-                FileEntry primaryFileEntry = filesIndex.get(primaryRange.getFileAsPath());
-                assert primaryFileEntry != null;
+        FileEntry fileEntry = findFile(fileAsPath);
+
+        if (range.isPrimary()) {
+            /* We should have created a file entry when we saw this type */
+            assert fileEntry != null;
+        } else {
+            /* Ok not to have seen the secondary range type */
+            if (fileEntry == null) {
+                fileEntry = addFileEntry(range.getClassName(), range.getFileName(), range.getFileAsPath(), range.getCachePath());
             }
+            /* We should have a file for the corresponding primary range. */
+            Range primaryRange = range.getPrimary();
+            FileEntry primaryFileEntry = filesIndex.get(primaryRange.getFileAsPath());
+            assert primaryFileEntry != null;
         }
         return fileEntry;
     }

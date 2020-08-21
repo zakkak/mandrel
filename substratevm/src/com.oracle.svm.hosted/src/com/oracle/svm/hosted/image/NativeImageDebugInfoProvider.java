@@ -45,6 +45,7 @@ import com.oracle.svm.core.config.ObjectLayout;
 import com.oracle.svm.core.graal.code.SubstrateBackend;
 import com.oracle.svm.hosted.image.sources.SourceManager;
 import com.oracle.svm.hosted.meta.HostedArrayClass;
+import com.oracle.svm.hosted.meta.HostedClass;
 import com.oracle.svm.hosted.meta.HostedField;
 import com.oracle.svm.hosted.meta.HostedMethod;
 import com.oracle.svm.hosted.meta.HostedType;
@@ -59,9 +60,11 @@ import org.graalvm.compiler.graph.NodeSourcePosition;
 import org.graalvm.nativeimage.ImageSingletons;
 
 
+import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.LineNumberTable;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.meta.ResolvedJavaType;
+import jdk.vm.ci.meta.Signature;
 
 /**
  * Implementation of the DebugInfoProvider API interface that allows type, code and heap data info
@@ -97,25 +100,49 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
     static ObjectLayout OBJECTLAYOUT = ConfigurationValues.getObjectLayout();
 
     private abstract class NativeImageDebugTypeInfo implements DebugTypeInfo {
+        protected String toJavaName(HostedType hostedType) {
+            /*
+             * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
+             * getSourceFilename to the wrapped class so for consistency we need to do the name
+             * lookup relative to the doubly unwrapped HostedType.
+             */
+            ResolvedJavaType javaType = hostedType.getWrapped().getWrapped();
+            return javaType.toJavaName();
+        }
 
         protected final HostedType hostedType;
         protected final ResolvedJavaType javaType;
         protected final Class<?> clazz;
+        private Path fullFilePath;
+        private final Path cachePath;
 
+        @SuppressWarnings("try")
         protected NativeImageDebugTypeInfo(HostedType hostedType) {
             this.hostedType = hostedType;
-            this.javaType = hostedType.getWrapped();
+            /*
+             * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
+             * getSourceFilename to the wrapped class so for consistency we need to do the type name
+             * and path lookup relative to the doubly unwrapped HostedType.
+             */
+            this.javaType = hostedType.getWrapped().getWrapped();
             if (hostedType instanceof OriginalClassProvider) {
                 clazz = ((OriginalClassProvider) hostedType).getJavaClass();
             } else {
                 clazz = null;
+            }
+            SourceManager sourceManager = ImageSingletons.lookup(SourceManager.class);
+            try (DebugContext.Scope s = debugContext.scope("DebugTypeInfo", hostedType)) {
+                fullFilePath = sourceManager.findAndCacheSource(javaType, clazz, debugContext);
+                this.cachePath = SubstrateOptions.getDebugInfoSourceCacheRoot();
+            } catch (Throwable e) {
+                throw debugContext.handle(e);
             }
         }
 
         @SuppressWarnings("try")
         @Override
         public void debugContext(Consumer<DebugContext> action) {
-            try (DebugContext.Scope s = debugContext.scope("DebugTypeInfo",  typeName())) {
+            try (DebugContext.Scope s = debugContext.scope("DebugTypeInfo", typeName())) {
                 action.accept(debugContext);
             } catch (Throwable e) {
                 throw debugContext.handle(e);
@@ -124,15 +151,49 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String typeName() {
-            return hostedType.toJavaName();
+            return toJavaName(hostedType);
+        }
+
+        @Override
+        public String fileName() {
+            if (fullFilePath != null) {
+                Path filename = fullFilePath.getFileName();
+                if (filename != null) {
+                    return filename.toString();
+                }
+            }
+            return "";
+        }
+
+        @Override
+        public Path filePath() {
+            if (fullFilePath != null) {
+                return fullFilePath.getParent();
+            }
+            return null;
+        }
+
+        @Override
+        public Path cachePath() {
+            return cachePath;
         }
 
         @Override
         public int size() {
             if (hostedType instanceof HostedInstanceClass) {
+                // We know the actual instance size in bytes.
                 return ((HostedInstanceClass) hostedType).getInstanceSize();
+            } else if (hostedType instanceof HostedArrayClass) {
+                // Use the size of header common to all arrays of this type.
+                return OBJECTLAYOUT.getArrayBaseOffset(hostedType.getComponentType().getStorageKind());
+            } else if (hostedType instanceof HostedInterface) {
+                // Use the size of the header common to all implementors.
+                return OBJECTLAYOUT.getFirstFieldOffset();
             } else {
-                return hostedType.getStorageKind().getByteCount();
+                // Use the number of bytes needed needed to store the value.
+                assert hostedType instanceof HostedPrimitiveType;
+                JavaKind javaKind = hostedType.getStorageKind();
+                return (javaKind == JavaKind.Void ? 0 : javaKind.getByteCount());
             }
         }
     }
@@ -163,13 +224,43 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         public int headerSize() {
             return OBJECTLAYOUT.getFirstFieldOffset();
         }
+
         @Override
         public Stream<DebugFieldInfo> fieldInfoProvider() {
             return Arrays.stream(hostedType.getInstanceFields(true)).map(this::createDebugFieldInfo);
         }
 
+        @Override
+        public Stream<DebugMethodInfo> methodInfoProvider() {
+            return Arrays.stream(hostedType.getAllDeclaredMethods()).map(this::createDebugMethodInfo);
+        }
+
+        @Override
+        public String superName() {
+            HostedClass superClass = hostedType.getSuperclass();
+            /*
+             * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
+             * getSourceFilename to the wrapped class so for consistency we need to do the path
+             * lookup relative to the doubly unwrapped HostedType.
+             */
+            if (superClass != null) {
+                return toJavaName(superClass);
+            }
+            return null;
+        }
+
+        @Override
+        public Stream<String> interfaces() {
+            final NativeImageDebugTypeInfo typeInfo = this;
+            return Arrays.stream(hostedType.getInterfaces()).map(this::toJavaName);
+        }
+
         protected NativeImageDebugFieldInfo createDebugFieldInfo(HostedField field) {
             return new NativeImageDebugFieldInfo(field);
+        }
+
+        protected NativeImageDebugMethodInfo createDebugMethodInfo(HostedMethod method) {
+            return new NativeImageDebugMethodInfo(method);
         }
 
         protected class NativeImageDebugFieldInfo implements DebugFieldInfo {
@@ -180,13 +271,19 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             }
 
             @Override
+            public String name() {
+                return field.getName();
+            }
+
+            @Override
             public String ownerType() {
                 return typeName();
             }
 
             @Override
             public String valueType() {
-                return field.getType().toJavaName();
+                HostedType valueType = field.getType();
+                return toJavaName(valueType);
             }
 
             @Override
@@ -198,11 +295,54 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             public int size() {
                 return OBJECTLAYOUT.sizeInBytes(field.getType().getStorageKind());
             }
+
+            @Override
+            public int modifiers() {
+                return field.getModifiers();
+            }
+        }
+        protected class NativeImageDebugMethodInfo implements DebugMethodInfo {
+            private final HostedMethod method;
+
+            NativeImageDebugMethodInfo(HostedMethod method) {
+                this.method = method;
+            }
+
+            @Override
+            public String name() {
+                return method.getName();
+            }
+
+            @Override
+            public String ownerType() {
+                return typeName();
+            }
+
+            @Override
+            public String resultType() {
+                return method.getSignature().getReturnType(null).toJavaName();
+            }
+
+            @Override
+            public List<String> paramTypes() {
+                LinkedList<String> paramTypes = new LinkedList<>();
+                Signature signature = method.getSignature();
+                for (int i = 0; i < signature.getParameterCount(false); i++) {
+                    paramTypes.add(signature.getParameterType(i, null).toJavaName());
+                }
+                return paramTypes;
+            }
+
+            @Override
+            public int modifiers() {
+                return method.getModifiers();
+            }
         }
     }
 
-    private class NativeImageDebugInterfaceTypeInfo extends NativeImageDebugTypeInfo implements DebugInterfaceTypeInfo {
+    private class NativeImageDebugInterfaceTypeInfo extends NativeImageDebugInstanceTypeInfo implements DebugInterfaceTypeInfo {
         HostedInterface interfaceClass;
+
         NativeImageDebugInterfaceTypeInfo(HostedInterface interfaceClass) {
             super(interfaceClass);
             this.interfaceClass = interfaceClass;
@@ -237,7 +377,8 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String elementType() {
-            return arrayClass.getComponentType().toJavaName();
+            HostedType elementType = arrayClass.getComponentType();
+            return toJavaName(elementType);
         }
     }
 
@@ -255,7 +396,8 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public int bitCount() {
-            return primitiveType.getStorageKind().getBitCount();
+            JavaKind javaKind = primitiveType.getStorageKind();
+            return (javaKind == JavaKind.Void ? 0 : javaKind.getBitCount());
         }
 
         @Override
@@ -265,21 +407,17 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
                 case 'B':
                 case 'S':
                 case 'I':
-                case 'J':
-                {
+                case 'J': {
                     return FLAG_NUMERIC | FLAG_INTEGRAL | FLAG_SIGNED;
                 }
-                case 'C':
-                {
+                case 'C': {
                     return FLAG_NUMERIC | FLAG_INTEGRAL;
                 }
                 case 'F':
-                case 'D':
-                {
+                case 'D': {
                     return FLAG_NUMERIC;
                 }
-                default:
-                {
+                default: {
                     assert typeChar == 'V' || typeChar == 'Z';
                     return 0;
                 }
@@ -371,7 +509,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String className() {
-            return javaType.toClassName();
+            return javaType.toJavaName();
         }
 
         @Override
@@ -545,14 +683,9 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
                 clazz = ((OriginalClassProvider) declaringClass).getJavaClass();
             }
             /*
-<<<<<<< HEAD
              * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
              * getSourceFilename to the wrapped class so for consistency we need to do the path
              * lookup relative to the doubly unwrapped HostedType or singly unwrapped AnalysisType.
-=======
-             * HostedType and HostedType punt calls to getSourceFilename to the wrapped class so
-             * for consistency we need to do the path lookup relative to the wrapped class.
->>>>>>> e5e46875909... basic cut of DebugTypeInfo interface and implementation
              */
             if (declaringClass instanceof HostedType) {
                 declaringClass = ((HostedType) declaringClass).getWrapped();

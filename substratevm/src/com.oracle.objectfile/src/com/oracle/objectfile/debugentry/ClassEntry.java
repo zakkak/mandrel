@@ -26,36 +26,51 @@
 
 package com.oracle.objectfile.debugentry;
 
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFieldInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFrameSizeChange;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugInstanceTypeInfo;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind;
+import org.graalvm.compiler.debug.DebugContext;
 
+import java.lang.reflect.Modifier;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * track debug info associated with a Java class.
+ * Track debug info associated with a Java class.
  */
-public class ClassEntry {
+public class ClassEntry extends TypeEntry {
     /**
-     * the name of the associated class.
+     * Details of this class's superclass.
      */
-    private String className;
+    protected ClassEntry superClass;
     /**
-     * details of the associated file.
+     * Details of this class's interfaces.
+     */
+    protected LinkedList<InterfaceClassEntry> interfaces;
+    /**
+     * Details of fields located in this instance.
+     */
+    protected LinkedList<FieldEntry> fields;
+    /**
+     * Details of the associated file.
      */
     private FileEntry fileEntry;
     /**
-     * a list recording details of all primary ranges included in this class sorted by ascending
+     * A list recording details of all primary ranges included in this class sorted by ascending
      * address range.
      */
     private LinkedList<PrimaryEntry> primaryEntries;
     /**
-     * an index identifying primary ranges which have already been encountered.
+     * An index identifying primary ranges which have already been encountered.
      */
     private Map<Range, PrimaryEntry> primaryIndex;
     /**
-     * an index of all primary and secondary files referenced from this class's compilation unit.
+     * An index of all primary and secondary files referenced from this class's compilation unit.
      */
     private Map<FileEntry, Integer> localFilesIndex;
     /**
@@ -63,11 +78,11 @@ public class ClassEntry {
      */
     private LinkedList<FileEntry> localFiles;
     /**
-     * an index of all primary and secondary dirs referenced from this class's compilation unit.
+     * An index of all primary and secondary dirs referenced from this class's compilation unit.
      */
     private HashMap<DirEntry, Integer> localDirsIndex;
     /**
-     * a list of the same dirs.
+     * A list of the same dirs.
      */
     private LinkedList<DirEntry> localDirs;
     /**
@@ -83,11 +98,11 @@ public class ClassEntry {
      */
     private int lineIndex;
     /**
-     * size of line number info prologue region for associated compilation unit.
+     * Size of line number info prologue region for associated compilation unit.
      */
     private int linePrologueSize;
     /**
-     * total size of line number info region for associated compilation unit.
+     * Total size of line number info region for associated compilation unit.
      */
     private int totalSize;
 
@@ -96,8 +111,10 @@ public class ClassEntry {
      */
     private boolean includesDeoptTarget;
 
-    public ClassEntry(String className, FileEntry fileEntry) {
-        this.className = className;
+    public ClassEntry(String className, FileEntry fileEntry, int size) {
+        super(className, size);
+        this.interfaces = new LinkedList<>();
+        this.fields = new LinkedList<>();
         this.fileEntry = fileEntry;
         this.primaryEntries = new LinkedList<>();
         this.primaryIndex = new HashMap<>();
@@ -254,10 +271,6 @@ public class ClassEntry {
         return fileEntry;
     }
 
-    public String getClassName() {
-        return className;
-    }
-
     public LinkedList<PrimaryEntry> getPrimaryEntries() {
         return primaryEntries;
     }
@@ -280,9 +293,93 @@ public class ClassEntry {
 
     public String getCachePath() {
         if (fileEntry != null) {
-            return fileEntry.getCachePath();
-        } else {
-            return "";
+            Path cachePath = fileEntry.getCachePath();
+            if (cachePath != null) {
+                return cachePath.toString();
+            }
         }
+        return "";
+    }
+
+    @Override
+    public DebugTypeKind typeKind() {
+        return DebugTypeKind.INSTANCE;
+    }
+
+    @Override
+    public boolean isClass() {
+        return true;
+    }
+
+    @Override
+    public void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext) {
+        assert TypeEntry.canonicalize(debugTypeInfo.typeName()).equals(typeName);
+        DebugInstanceTypeInfo debugInstanceTypeInfo = (DebugInstanceTypeInfo) debugTypeInfo;
+        /* Add details of super and interface classes */
+        String superName = debugInstanceTypeInfo.superName();
+        if (superName != null) {
+            superName = superName.replace("$", ".");
+        }
+        debugContext.log("typename %s adding super %s\n", typeName, superName);
+        if (superName != null) {
+            this.superClass = debugInfoBase.lookupClassEntry(superName);
+        }
+        debugInstanceTypeInfo.interfaces().forEach(interfaceName -> processInterface(interfaceName, debugInfoBase, debugContext));
+        /* Add details of fields and field types */
+        debugInstanceTypeInfo.fieldInfoProvider().forEach(debugFieldInfo -> this.processField(debugFieldInfo, debugInfoBase, debugContext));
+    }
+
+    private void processInterface(String interfaceName, DebugInfoBase debugInfoBase, DebugContext debugContext) {
+        debugContext.log("typename %s adding interface %s\n", typeName, interfaceName);
+        ClassEntry entry = debugInfoBase.lookupClassEntry(interfaceName.replace("$", "."));
+        assert entry instanceof InterfaceClassEntry;
+        InterfaceClassEntry interfaceClassEntry = (InterfaceClassEntry) entry;
+        interfaces.add(interfaceClassEntry);
+        interfaceClassEntry.addImplementor(this, debugContext);
+    }
+
+    private void processField(DebugFieldInfo debugFieldInfo, DebugInfoBase debugInfoBase, DebugContext debugContext) {
+        String fieldName = debugFieldInfo.name();
+        String valueTypeName = TypeEntry.canonicalize(debugFieldInfo.valueType());
+        int size = debugFieldInfo.size();
+        int offset = debugFieldInfo.offset();
+        int modifiers = debugFieldInfo.modifiers();
+        debugContext.log("typename %s adding %s field %s type %s size %s at offset %d\n",
+                        typeName, memberModifiers(modifiers), fieldName, valueTypeName, size, offset);
+        TypeEntry valueType = debugInfoBase.lookupTypeEntry(valueTypeName);
+        fields.add(new FieldEntry(fieldName, this, valueType, size, offset, modifiers));
+    }
+
+    private String memberModifiers(int modifiers) {
+        StringBuilder builder = new StringBuilder();
+        if (Modifier.isPublic(modifiers)) {
+            builder.append("public ");
+        } else if (Modifier.isProtected(modifiers)) {
+            builder.append("protected ");
+        } else if (Modifier.isPrivate(modifiers)) {
+            builder.append("private ");
+        }
+        if (Modifier.isFinal(modifiers)) {
+            builder.append("final ");
+        }
+        if (Modifier.isAbstract(modifiers)) {
+            builder.append("abstract ");
+        } else if (Modifier.isVolatile(modifiers)) {
+            builder.append("volatile ");
+        } else if (Modifier.isTransient(modifiers)) {
+            builder.append("transient ");
+        } else if (Modifier.isSynchronized(modifiers)) {
+            builder.append("synchronized ");
+        }
+        if (Modifier.isNative(modifiers)) {
+            builder.append("native ");
+        }
+        if (Modifier.isStatic(modifiers)) {
+            builder.append("static");
+        } else {
+            builder.append("instance");
+        }
+
+        return builder.toString();
     }
 }
