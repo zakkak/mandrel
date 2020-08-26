@@ -16,12 +16,12 @@ To contribute please fork this repository and open a pull request (PR).
 
 ## Repository Structure
 
-Mandrel, being a downstream distribution of GraalVM CE, is not developed on the master branch.
+Mandrel, being a downstream distribution of GraalVM CE, is not developed on the `default` branch.
 Instead version specific branches, based on the corresponding GraalVM CE release, are used for development and maintenance. 
 For instance, Mandrel 20.1.x.x releases are developed in the `mandrel/20.1` branch.
 Similarly, Mandrel 20.2.x.x releases are developed in the `mandrel/20.2` branch and so on.
 
-The `master` branch is used only as a landing page and for hosting some housekeeping github actions workflows and templates.
+The `default` branch is used only as a landing page and for hosting some housekeeping github actions workflows and templates.
 
 In addition to the `mandrel/XX.Y` branches Mandrel also includes `graal/X` branches like `graal/master`.
 These branches are mirrors of the corresponding upstream branch and are being synchronized and tested nightly, in an effort to detect breaking changes upstream as soon as possible. 
