@@ -61,7 +61,7 @@ jobs:
     - name: Build Mandrel
       run: |
         cd ${{ github.workspace }}/../mandrel-packaging
-        ./buildJDK.sh
+        ${JAVA_HOME}/bin/java -ea build.java --mx-home ${MX_HOME} --mandrel-repo ${MANDREL_REPO} --mandrel-home ${MANDREL_HOME} --archive-suffix tar.gz
         ${MANDREL_HOME}/bin/native-image --version
         mv mandrel-java11-linux-amd64-*.tar.gz ${{ github.workspace }}/mandreljdk.tgz
     - name: Persist Mandrel build
