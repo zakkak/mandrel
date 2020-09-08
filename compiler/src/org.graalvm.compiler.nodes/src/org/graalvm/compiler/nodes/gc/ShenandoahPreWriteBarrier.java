@@ -79,5 +79,10 @@ public class ShenandoahPreWriteBarrier extends ObjectWriteBarrier implements Deo
         updateUsages(stateBefore, state);
         stateBefore = state;
     }
+
+    @Override
+    public Kind getKind() {
+        return Kind.PRE_BARRIER;
+    }
 }
 
