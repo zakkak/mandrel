@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd" xmlns="http://maven.apache.org/SETTINGS/1.1.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <profiles>
+    <profile>
+      <repositories>
+        <repository>
+          <releases />
+          <snapshots />
+          <id>Gradle Plugin Repository-0</id>
+          <name>Gradle Plugin Repository-0</name>
+          <url>https://plugins.gradle.org/m2/</url>
+        </repository>
+      </repositories>
+      <id>generated-by-gme</id>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>generated-by-gme</activeProfile>
+  </activeProfiles>
+</settings>
