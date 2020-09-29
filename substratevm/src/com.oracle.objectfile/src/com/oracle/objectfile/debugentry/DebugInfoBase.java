@@ -256,7 +256,7 @@ public abstract class DebugInfoBase {
                 String classNameAtLine = TypeEntry.canonicalize(debugLineInfo.ownerType());
                 String methodNameAtLine = debugLineInfo.name();
                 String symbolNameAtLine = debugLineInfo.symbolNameForMethod();
-                boolean isInlined = false;
+                boolean isInlined = debugLineInfo.getCaller() != null;
                 int loAtLine = lo + debugLineInfo.addressLo();
                 int hiAtLine = lo + debugLineInfo.addressHi();
                 int line = debugLineInfo.line();
