@@ -949,7 +949,6 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
                 return Stream.empty();
             }
             return compilation.getSourceMappings().stream()
-                            .filter(NativeImageDebugInfoProvider::filterLineInfoSourceMapping)
                             .map(sourceMapping -> new NativeImageDebugLineInfo(sourceMapping));
         }
 
@@ -1015,13 +1014,6 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         public int modifiers() {
             return hostedMethod.getModifiers();
         }
-    }
-
-    private static boolean filterLineInfoSourceMapping(SourceMapping sourceMapping) {
-        if (!SubstrateOptions.OmitInlinedMethodDebugLineInfo.getValue()) {
-            return true;
-        }
-        return sourceMapping.getSourcePosition().getCaller() == null;
     }
 
     /**
