@@ -35,12 +35,15 @@ package com.oracle.objectfile.debugentry;
 public class Range {
     private static final String CLASS_DELIMITER = ".";
     private final FileEntry fileEntry;
+    private final Range caller;
     private MethodEntry methodEntry;
     private final String symbolName;
     private final String fullMethodNameWithParams;
     private final int lo;
     private final int hi;
     private final int line;
+    private final boolean isInlined;
+    private final boolean withChildren;
     /*
      * This is null for a primary range.
      */
@@ -50,21 +53,22 @@ public class Range {
      * Create a primary range.
      */
     public Range(String symbolName, StringTable stringTable, MethodEntry methodEntry, FileEntry fileEntry, int lo, int hi, int line) {
-        this(symbolName, stringTable, methodEntry, fileEntry, lo, hi, line, null);
+        this(symbolName, stringTable, methodEntry, fileEntry, lo, hi, line, null, false, false, null);
     }
 
     /*
      * Create a secondary range.
      */
-    public Range(String symbolName, StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line, Range primary) {
-        this(symbolName, stringTable, methodEntry, methodEntry.fileEntry, lo, hi, line, primary);
+    public Range(String symbolName, StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line, Range primary,
+                    boolean isInline, boolean withChildren, Range caller) {
+        this(symbolName, stringTable, methodEntry, methodEntry.fileEntry, lo, hi, line, primary, isInline, withChildren, caller);
     }
 
     /*
      * Create a primary or secondary range.
      */
     private Range(String symbolName, StringTable stringTable, MethodEntry methodEntry, FileEntry fileEntry, int lo, int hi, int line,
-                    Range primary) {
+                    Range primary, boolean isInline, boolean withChildren, Range caller) {
         this.fileEntry = fileEntry;
         if (fileEntry != null) {
             stringTable.uniqueDebugString(fileEntry.getFileName());
@@ -77,7 +81,10 @@ public class Range {
         this.lo = lo;
         this.hi = hi;
         this.line = line;
+        this.isInlined = isInline;
         this.primary = primary;
+        this.withChildren = withChildren;
+        this.caller = caller;
     }
 
     public boolean contains(Range other) {
@@ -182,5 +189,17 @@ public class Range {
 
     public String getFileName() {
         return fileEntry.getFileName();
+    }
+
+    public boolean isInlined() {
+        return isInlined;
+    }
+
+    public boolean withChildren() {
+        return withChildren;
+    }
+
+    public Range getCaller() {
+        return caller;
     }
 }
