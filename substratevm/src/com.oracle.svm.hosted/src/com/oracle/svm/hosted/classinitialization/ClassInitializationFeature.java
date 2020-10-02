@@ -394,7 +394,7 @@ public class ClassInitializationFeature implements Feature {
             }
             return false;
         } catch (NoClassDefFoundError e) {
-            if (!NativeImageOptions.AllowIncompleteClasspath.getValue()) {
+            if (NativeImageOptions.AllowIncompleteClasspath.getValue()) {
                 return false;
             }
 
