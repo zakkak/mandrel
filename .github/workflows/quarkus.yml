@@ -54,9 +54,6 @@ jobs:
         repository: graalvm/mandrel-packaging.git
         ref: master
         path: mandrel-packaging
-    - uses: n1hility/cancel-previous-runs@v2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
     - uses: actions/cache@v1
       with:
         path: ~/.mx
