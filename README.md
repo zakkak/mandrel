@@ -37,16 +37,15 @@ Mandrel's `native-image` depends on the following packages:
 * glibc-devel
 * zlib-devel
 * gcc
-* libffi-devel
 
 On Fedora/CentOS/RHEL they can be installed with:
 ```bash
-dnf install glibc-devel zlib-devel gcc libffi-devel
+dnf install glibc-devel zlib-devel gcc
 ```
 
 On Ubuntu-like systems with:
 ```bash
-apt install gcc zlib1g-dev libffi-dev
+apt install gcc zlib1g-dev
 ```
 
 ## Building Mandrel From Source
