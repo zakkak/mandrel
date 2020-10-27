@@ -23,7 +23,7 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.graal.test.jdk11;
+package com.oracle.svm.graal.test;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;

@@ -23,7 +23,7 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.graal.test.jdk11;
+package com.oracle.svm.graal.test;
 
 import com.oracle.svm.graal.isolated.IsolatedSpeculationLog;
 import org.junit.Test;

@@ -686,7 +686,7 @@ suite = {
             ],
         },
 
-        "com.oracle.svm.graal.test.jdk11": {
+        "com.oracle.svm.graal.test": {
             "subDir": "src",
             "sourceDirs": ["src"],
             "dependencies": [
@@ -702,7 +702,7 @@ suite = {
             "annotationProcessors": [
                 "compiler:GRAAL_PROCESSOR",
             ],
-            "javaCompliance": "11+",
+            "javaCompliance": "8+",
             "spotbugs": "false",
             "testProject": True,
         },
@@ -1192,7 +1192,7 @@ suite = {
             "com.oracle.svm.test",
             "com.oracle.svm.test.jdk11",
             "com.oracle.svm.configure.test",
-            "com.oracle.svm.graal.test.jdk11",
+            "com.oracle.svm.graal.test",
           ],
           "distDependencies": [
             "mx:JUNIT_TOOL",
