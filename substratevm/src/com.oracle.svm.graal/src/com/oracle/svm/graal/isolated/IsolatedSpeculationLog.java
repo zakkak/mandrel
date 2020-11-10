@@ -24,13 +24,7 @@
  */
 package com.oracle.svm.graal.isolated;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
-import java.util.function.Supplier;
 
 import jdk.vm.ci.meta.ResolvedJavaField;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
@@ -58,81 +52,27 @@ public final class IsolatedSpeculationLog extends IsolatedObjectProxy<Speculatio
         collectFailedSpeculations0(IsolatedCompileContext.get().getClient(), handle);
     }
 
-    static class SpeculationReasonInvocationHandler implements InvocationHandler {
-        private final IsolatedSpeculationReasonEncoding receiver;
-
-        SpeculationReasonInvocationHandler(IsolatedSpeculationReasonEncoding receiver) {
-            this.receiver = receiver;
-        }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            return IsolatedSpeculationReasonEncoding.class.getDeclaredMethod(method.getName(), method.getParameterTypes()).invoke(receiver, args);
-        }
-    }
-
-    static class SpeculationReasonEncodingSupplier implements Supplier<Object> {
-        private static final Class<?> PROXY_CLASS;
-        private static final Constructor<?> CONSTRUCTOR;
-        private static final Class<?> CLASS;
-        private static final String CLASS_NAME = "jdk.vm.ci.meta.SpeculationLog$SpeculationReasonEncoding";
-
-        static {
-            Class<?> speculationReasonEncodingClass = null;
-            try {
-                speculationReasonEncodingClass = Class.forName(CLASS_NAME);
-            } catch (ClassNotFoundException e) {
-                VMError.shouldNotReachHere(CLASS_NAME +
-                                " not found in JDK. UnencodedSpeculationReason should have been used as SpeculationReason");
-            }
-            CLASS = speculationReasonEncodingClass;
-            assert CLASS != null;
-            PROXY_CLASS = Proxy.newProxyInstance(CLASS.getClassLoader(), new Class<?>[]{CLASS},
-                            new SpeculationReasonInvocationHandler(new IsolatedSpeculationReasonEncoding())).getClass();
-            Constructor<?> declaredConstructor = null;
-            try {
-                declaredConstructor = PROXY_CLASS.getDeclaredConstructor(CLASS);
-            } catch (NoSuchMethodException e) {
-                VMError.shouldNotReachHere("Failed to get constructor for " + PROXY_CLASS);
-            }
-            CONSTRUCTOR = declaredConstructor;
-        }
-
-        @Override
-        public Object get() {
-            try {
-                return CONSTRUCTOR.newInstance(new SpeculationReasonInvocationHandler(new IsolatedSpeculationReasonEncoding()));
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                VMError.shouldNotReachHere("Failed to instantiate " + CLASS_NAME + "through proxy", e);
-            }
-            return null;
-        }
-    }
-
     private byte[] encodeAsByteArray(SpeculationReason reason) {
-        byte[] bytes = null;
+        Class<? extends SpeculationReason> speculationReasonClass = null;
         if (reason instanceof UnencodedSpeculationReason) {
-            IsolatedSpeculationReasonEncoding encoding = encode((UnencodedSpeculationReason) reason);
-            bytes = encoding.getByteArray();
+            speculationReasonClass = UnencodedSpeculationReason.class;
         } else {
             try {
-                final Method encode = Class.forName("jdk.vm.ci.meta.EncodedSpeculationReason")
-                                .getDeclaredMethod("encode", Supplier.class);
-                IsolatedSpeculationReasonEncoding encoding = (IsolatedSpeculationReasonEncoding) encode.invoke(reason, new SpeculationReasonEncodingSupplier());
-                bytes = encoding.getByteArray();
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e) {
-                VMError.shouldNotReachHere("Failed to invoke \"jdk.vm.ci.meta.EncodedSpeculationReason#encode\" through reflection", e);
+                speculationReasonClass = (Class<? extends SpeculationReason>) Class.forName("jdk.vm.ci.meta.EncodedSpeculationReason");
+            } catch (ClassNotFoundException e) {
+                VMError.shouldNotReachHere("Failed to get class \"jdk.vm.ci.meta.EncodedSpeculationReason\"", e);
             }
         }
-        return bytes;
+        IsolatedSpeculationReasonEncoding encoding = encode(speculationReasonClass, reason);
+        return encoding.getByteArray();
     }
 
     /** Adapted from {@code jdk.vm.ci.meta.EncodedSpeculationReason#encode}. */
-    public IsolatedSpeculationReasonEncoding encode(UnencodedSpeculationReason reason) {
+    public IsolatedSpeculationReasonEncoding encode(Class<? extends SpeculationReason> klass, Object reason) {
         IsolatedSpeculationReasonEncoding encoding = new IsolatedSpeculationReasonEncoding();
         try {
-            int groupId = UnencodedSpeculationReason.class.getDeclaredField("groupId").getInt(reason);
-            Object[] context = (Object[]) UnencodedSpeculationReason.class.getDeclaredField("context").get(reason);
+            int groupId = klass.getDeclaredField("groupId").getInt(reason);
+            Object[] context = (Object[]) klass.getDeclaredField("context").get(reason);
             encoding.addInt(groupId);
             for (Object o : context) {
                 if (o == null) {
