@@ -35,7 +35,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -109,9 +108,15 @@ public abstract class DebugInfoBase {
      * List of of files which contain primary or secondary ranges.
      */
     private LinkedList<FileEntry> files = new LinkedList<>();
+    /**
+     * Flag set to true if heap references are stored as addresses relative to
+     * a heap base register otherwise false.
+     */
+    private boolean useHeapBase;
 
     public DebugInfoBase(ByteOrder byteOrder) {
         this.byteOrder = byteOrder;
+        this.useHeapBase = true;
     }
 
     /**
@@ -129,6 +134,11 @@ public abstract class DebugInfoBase {
          */
 
         /*
+         * track whether we need to use a heap base regsiter
+         */
+        useHeapBase = debugInfoProvider.useHeapBase();
+
+        /*
          * Ensure we have a null string in the string section.
          */
         stringTable.uniqueDebugString("");
@@ -136,6 +146,7 @@ public abstract class DebugInfoBase {
         // create all the types
         debugInfoProvider.typeInfoProvider().forEach(debugTypeInfo -> debugTypeInfo.debugContext((debugContext) -> {
             String typeName = TypeEntry.canonicalize(debugTypeInfo.typeName());
+            typeName = stringTable.uniqueDebugString(typeName);
             DebugTypeKind typeKind = debugTypeInfo.typeKind();
             int byteSize = debugTypeInfo.size();
 
@@ -166,16 +177,20 @@ public abstract class DebugInfoBase {
             String className = TypeEntry.canonicalize(debugCodeInfo.className());
             String methodName = debugCodeInfo.methodName();
             String symbolName = debugCodeInfo.symbolNameForMethod();
-            String paramNames = debugCodeInfo.paramNames();
+            String paramSignature = debugCodeInfo.paramSignature();
             String returnTypeName = TypeEntry.canonicalize(debugCodeInfo.returnTypeName());
             int lo = debugCodeInfo.addressLo();
             int hi = debugCodeInfo.addressHi();
             int primaryLine = debugCodeInfo.line();
             boolean isDeoptTarget = debugCodeInfo.isDeoptTarget();
+            int modifiers = debugCodeInfo.getModifiers();
 
-            Range primaryRange = new Range(fileName, filePath, cachePath, className, methodName, symbolName, paramNames, returnTypeName, stringTable, lo, hi, primaryLine, isDeoptTarget);
+            // search for a method defining this primary range
+            ClassEntry classEntry = ensureClassEntry(className);
+            FileEntry fileEntry = ensureFileEntry(fileName, filePath, cachePath);
+            Range primaryRange = classEntry.makePrimaryRange(methodName, symbolName, paramSignature, returnTypeName, stringTable, fileEntry, lo, hi, primaryLine, modifiers, isDeoptTarget);
             debugContext.log(DebugContext.INFO_LEVEL, "PrimaryRange %s.%s %s %s:%d [0x%x, 0x%x]", className, methodName, filePath, fileName, primaryLine, lo, hi);
-            addRange(primaryRange, debugCodeInfo.getFrameSizeChanges(), debugCodeInfo.getFrameSize());
+            classEntry.indexPrimary(primaryRange, debugCodeInfo.getFrameSizeChanges(), debugCodeInfo.getFrameSize());
             debugCodeInfo.lineInfoProvider().forEach(debugLineInfo -> {
                 String fileNameAtLine = debugLineInfo.fileName();
                 Path filePathAtLine = debugLineInfo.filePath();
@@ -188,40 +203,43 @@ public abstract class DebugInfoBase {
                 Path cachePathAtLine = debugLineInfo.cachePath();
                 /*
                  * Record all subranges even if they have no line or file so we at least get a
-                 * symbol for them.
+                 * symbol for them and don't see a break in the address range.
                  */
-                Range subRange = new Range(fileNameAtLine, filePathAtLine, cachePathAtLine, classNameAtLine, methodNameAtLine, symbolNameAtLine, "", "", stringTable, loAtLine, hiAtLine, line,
-                                primaryRange);
-                addSubRange(primaryRange, subRange);
+                FileEntry subFileEntry = ensureFileEntry(fileNameAtLine, filePathAtLine, cachePathAtLine);
+                Range subRange = new Range(classNameAtLine, methodNameAtLine, symbolNameAtLine, stringTable, subFileEntry, loAtLine, hiAtLine, line, primaryRange);
+                classEntry.indexSubRange(subRange);
                 try (DebugContext.Scope s = debugContext.scope("Subranges")) {
                     debugContext.log(DebugContext.VERBOSE_LEVEL, "SubRange %s.%s %s %s:%d 0x%x, 0x%x]", classNameAtLine, methodNameAtLine, filePathAtLine, fileNameAtLine, line, loAtLine, hiAtLine);
                 }
             });
         }));
-        /*
-         * This will be needed once we add support for data info:
-         *
-         * DebugDataInfoProvider dataInfoProvider = debugInfoProvider.dataInfoProvider(); for
-         * (DebugDataInfo debugDataInfo : dataInfoProvider) { install details of heap elements
-         * String name = debugDataInfo.toString(); }
-         */
+
+       debugInfoProvider.dataInfoProvider().forEach(debugDataInfo -> debugDataInfo.debugContext((debugContext) -> {
+           String provenance = debugDataInfo.getProvenance();
+           String typeName = debugDataInfo.getTypeName();
+           String partitionName = debugDataInfo.getPartition();
+           // address is heap-register relative pointer
+           long address = debugDataInfo.getAddress();
+           long size = debugDataInfo.getSize();
+            debugContext.log(DebugContext.INFO_LEVEL, "Data: address 0x%x size 0x%x type %s partition %s provenance %s ", address, size, typeName, partitionName, provenance);
+       }));
     }
 
     private TypeEntry createTypeEntry(String typeName, String fileName, Path filePath, Path cachePath, int size, DebugTypeKind typeKind) {
         TypeEntry typeEntry = null;
         switch (typeKind) {
             case INSTANCE: {
-                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                FileEntry fileEntry = addFileEntry(fileName, filePath, cachePath);
                 typeEntry = new ClassEntry(typeName, fileEntry, size);
                 break;
             }
             case INTERFACE: {
-                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                FileEntry fileEntry = addFileEntry(fileName, filePath, cachePath);
                 typeEntry = new InterfaceClassEntry(typeName, fileEntry, size);
                 break;
             }
             case ENUM: {
-                FileEntry fileEntry = addFileEntry(typeName, fileName, filePath, cachePath);
+                FileEntry fileEntry = addFileEntry(fileName, filePath, cachePath);
                 typeEntry = new EnumClassEntry(typeName, fileEntry, size);
                 break;
             }
@@ -234,6 +252,11 @@ public abstract class DebugInfoBase {
                 assert fileName.length() == 0;
                 assert filePath == null;
                 typeEntry = new ArrayTypeEntry(typeName, size);
+                break;
+            case HEADER:
+                assert fileName.length() == 0;
+                assert filePath == null;
+                typeEntry = new HeaderTypeEntry(typeName, size);
                 break;
         }
         return typeEntry;
@@ -253,7 +276,7 @@ public abstract class DebugInfoBase {
         return typeEntry;
     }
 
-    TypeEntry lookupTypeEntry(String typeName) {
+    public TypeEntry lookupTypeEntry(String typeName) {
         TypeEntry typeEntry = typesIndex.get(typeName);
         if (typeEntry == null) {
             throw new RuntimeException("type entry not found " + typeName);
@@ -269,8 +292,7 @@ public abstract class DebugInfoBase {
         return (ClassEntry) typeEntry;
     }
 
-    private ClassEntry ensureClassEntry(Range range) {
-        String className = range.getClassName();
+    private ClassEntry ensureClassEntry(String className) {
         /*
          * See if we already have an entry.
          */
@@ -282,12 +304,11 @@ public abstract class DebugInfoBase {
             primaryClasses.add(classEntry);
             primaryClassesIndex.put(className, classEntry);
         }
-        assert (classEntry.getFileName().equals(range.getFileName()));
         assert (classEntry.getTypeName().equals(className));
         return classEntry;
     }
 
-    private FileEntry addFileEntry(String typeName, String fileName, Path filePath, Path cachePath) {
+    private FileEntry addFileEntry(String fileName, Path filePath, Path cachePath) {
         assert fileName != null;
         Path fileAsPath;
         if (filePath != null) {
@@ -298,6 +319,9 @@ public abstract class DebugInfoBase {
         FileEntry fileEntry = filesIndex.get(fileAsPath);
         if (fileEntry == null) {
             DirEntry dirEntry = ensureDirEntry(filePath);
+            // ensure file and cachepath are added to the debug_str section
+            uniqueDebugString(fileName);
+            uniqueDebugString(cachePath.toString());
             fileEntry = new FileEntry(fileName, dirEntry, cachePath);
             files.add(fileEntry);
             /*
@@ -311,53 +335,22 @@ public abstract class DebugInfoBase {
         return fileEntry;
     }
 
-    private FileEntry ensureFileEntry(Range range) {
-        String fileName = range.getFileName();
-        if (fileName == null) {
+    protected FileEntry ensureFileEntry(String fileName, Path filePath, Path cachePath) {
+        if (fileName == null || fileName.length() == 0) {
             return null;
         }
-        Path fileAsPath = range.getFileAsPath();
-        /*
-         * Ensure we have an entry.
-         */
-        FileEntry fileEntry = findFile(fileAsPath);
-
-        if (range.isPrimary()) {
-            /* We should have created a file entry when we saw this type */
-            assert fileEntry != null;
+        Path fileAsPath;
+        if (filePath == null) {
+            fileAsPath = Paths.get(fileName);
         } else {
-            /* Ok not to have seen the secondary range type */
-            if (fileEntry == null) {
-                fileEntry = addFileEntry(range.getClassName(), range.getFileName(), range.getFileAsPath(), range.getCachePath());
-            }
-            /* We should have a file for the corresponding primary range. */
-            Range primaryRange = range.getPrimary();
-            FileEntry primaryFileEntry = filesIndex.get(primaryRange.getFileAsPath());
-            assert primaryFileEntry != null;
+            fileAsPath = filePath.resolve(fileName);
+        }
+        // Reuse any existing entry
+        FileEntry fileEntry = findFile(fileAsPath);
+        if (fileEntry == null) {
+            fileEntry = addFileEntry(fileName, filePath, cachePath);
         }
         return fileEntry;
-    }
-
-    private void addRange(Range primaryRange, List<DebugInfoProvider.DebugFrameSizeChange> frameSizeInfos, int frameSize) {
-        assert primaryRange.isPrimary();
-        ClassEntry classEntry = ensureClassEntry(primaryRange);
-        classEntry.addPrimary(primaryRange, frameSizeInfos, frameSize);
-    }
-
-    private void addSubRange(Range primaryRange, Range subrange) {
-        assert primaryRange.isPrimary();
-        assert !subrange.isPrimary();
-        String className = primaryRange.getClassName();
-        ClassEntry classEntry = primaryClassesIndex.get(className);
-        FileEntry subrangeFileEntry = ensureFileEntry(subrange);
-        /*
-         * The primary range should already have been seen and associated with a primary class
-         * entry.
-         */
-        assert classEntry.primaryIndexFor(primaryRange) != null;
-        if (subrangeFileEntry != null) {
-            classEntry.addSubRange(subrange, subrangeFileEntry);
-        }
     }
 
     private DirEntry ensureDirEntry(Path filePath) {
@@ -366,6 +359,8 @@ public abstract class DebugInfoBase {
         }
         DirEntry dirEntry = dirsIndex.get(filePath);
         if (dirEntry == null) {
+            // ensure dir path is entered into the debug_str section
+            uniqueDebugString(filePath.toString());
             dirEntry = new DirEntry(filePath);
             dirsIndex.put(filePath, dirEntry);
         }
@@ -375,6 +370,10 @@ public abstract class DebugInfoBase {
     /* Accessors to query the debug info model. */
     public ByteOrder getByteOrder() {
         return byteOrder;
+    }
+
+    public LinkedList<TypeEntry> getTypes() {
+        return types;
     }
 
     public LinkedList<ClassEntry> getPrimaryClasses() {
@@ -399,10 +398,23 @@ public abstract class DebugInfoBase {
      * Indirects this call to the string table.
      *
      * @param string the string whose index is required.
+     */
+    public String uniqueDebugString(String string) {
+        return stringTable.uniqueDebugString(string);
+    }
+
+    /**
+     * Indirects this call to the string table.
+     *
+     * @param string the string whose index is required.
      *
      * @return the offset of the string in the .debug_str section.
      */
     public int debugStringIndex(String string) {
         return stringTable.debugStringIndex(string);
+    }
+
+    public boolean useHeapBase() {
+        return useHeapBase;
     }
 }

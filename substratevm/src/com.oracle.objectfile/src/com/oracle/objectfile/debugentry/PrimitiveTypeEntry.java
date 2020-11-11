@@ -36,10 +36,13 @@ import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugPrimitiveTy
 import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugPrimitiveTypeInfo.FLAG_SIGNED;
 
 public class PrimitiveTypeEntry extends TypeEntry {
+    char typeChar;
     int flags;
     int bitCount;
+
     public PrimitiveTypeEntry(String typeName, int size) {
         super(typeName, size);
+        typeChar = '#';
         flags = 0;
         bitCount = 0;
     }
@@ -53,9 +56,11 @@ public class PrimitiveTypeEntry extends TypeEntry {
     public void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext) {
         DebugPrimitiveTypeInfo debugPrimitiveTypeInfo = (DebugPrimitiveTypeInfo) debugTypeInfo;
         flags = debugPrimitiveTypeInfo.flags();
+        typeChar = debugPrimitiveTypeInfo.typeChar();
         bitCount = debugPrimitiveTypeInfo.bitCount();
-        debugContext.log("typename %s %s(%d)\n", typeName, decodeFlags(), bitCount);
+        debugContext.log("typename %s %s (%d bits)\n", typeName, decodeFlags(), bitCount);
     }
+
     private String decodeFlags() {
         StringBuilder builder = new StringBuilder();
         if ((flags & FLAG_NUMERIC) != 0) {
@@ -70,8 +75,24 @@ public class PrimitiveTypeEntry extends TypeEntry {
                 builder.append("FLOATING");
             }
         } else {
-            builder.append("LOGICAL");
+            if (bitCount > 0) {
+                builder.append("LOGICAL");
+            } else {
+                builder.append("VOID");
+            }
         }
         return builder.toString();
+    }
+
+    public char getTypeChar() {
+        return typeChar;
+    }
+
+    public int getBitCount() {
+        return bitCount;
+    }
+
+    public int getFlags() {
+        return flags;
     }
 }

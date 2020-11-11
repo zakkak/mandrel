@@ -38,16 +38,38 @@ import org.graalvm.compiler.debug.DebugContext;
  * underlying object file so that the latter can insert appropriate debug info.
  */
 public interface DebugInfoProvider {
+    boolean useHeapBase();
+
     /**
-     * Access details of a specific type.
+     * An interface implemented by items that can be located in a file
      */
-    interface DebugTypeInfo {
+    interface DebugFileInfo {
+        /**
+         * @return the name of the file containing a file element excluding any path.
+         */
+        String fileName();
+
+        /**
+         * @return a relative path to the file containing a file element derived from its package
+         *         name or null if the element is in the empty package.
+         */
+        Path filePath();
+
+        /**
+         * @return a relative path to the source cache containing the cached source file of a
+         *         file element or {@code null} if sources are not available.
+         */
+        Path cachePath();
+    }
+
+    interface DebugTypeInfo extends DebugFileInfo {
         enum DebugTypeKind {
             PRIMITIVE,
             ENUM,
             INSTANCE,
             INTERFACE,
-            ARRAY;
+            ARRAY,
+            HEADER;
 
             @Override
             public String toString() {
@@ -62,6 +84,8 @@ public interface DebugInfoProvider {
                         return "interface";
                     case ARRAY:
                         return "array";
+                    case HEADER:
+                        return "header";
                     default:
                         return "???";
                 }
@@ -76,23 +100,6 @@ public interface DebugInfoProvider {
         String typeName();
 
         DebugTypeKind typeKind();
-
-        /**
-         * @return the name of the file containing a compiled method excluding any path.
-         */
-        String fileName();
-
-        /**
-         * @return a relative path to the file containing a compiled method derived from its package
-         *         name or null if the method is in the empty package.
-         */
-        Path filePath();
-
-        /**
-         * @return a relative path to the source cache containing the sources of a compiled method
-         *         or {@code null} if sources are not available.
-         */
-        Path cachePath();
 
         int size();
     }
@@ -139,57 +146,44 @@ public interface DebugInfoProvider {
 
         int bitCount();
 
+        char typeChar();
+
         int flags();
     }
 
-    interface DebugFieldInfo {
+    interface DebugHeaderTypeInfo extends DebugTypeInfo {
+
+        Stream<DebugFieldInfo> fieldInfoProvider();
+    }
+
+    interface DebugMemberInfo extends DebugFileInfo {
+
         String name();
 
         String ownerType();
 
         String valueType();
 
-        int offset();
-
-        int size();
-
         int modifiers();
     }
 
-    interface DebugMethodInfo {
-        String name();
+    interface DebugFieldInfo extends DebugMemberInfo {
+        int offset();
 
-        String ownerType();
+        int size();
+    }
 
-        String resultType();
-
+    interface DebugMethodInfo extends DebugMemberInfo {
         List<String> paramTypes();
 
-        int modifiers();
+        List<String> paramNames();
     }
 
     /**
      * Access details of a specific compiled method.
      */
-    interface DebugCodeInfo {
+    interface DebugCodeInfo extends DebugFileInfo {
         void debugContext(Consumer<DebugContext> action);
-
-        /**
-         * @return the name of the file containing a compiled method excluding any path.
-         */
-        String fileName();
-
-        /**
-         * @return a relative path to the file containing a compiled method derived from its package
-         *         name or null if the method is in the empty package.
-         */
-        Path filePath();
-
-        /**
-         * @return a relative path to the source cache containing the sources of a compiled method
-         *         or {@code null} if sources are not available.
-         */
-        Path cachePath();
 
         /**
          * @return the fully qualified name of the class owning the compiled method.
@@ -232,7 +226,7 @@ public interface DebugInfoProvider {
         /**
          * @return a string identifying the method parameters.
          */
-        String paramNames();
+        String paramSignature();
 
         /**
          * @return a string identifying the method return type.
@@ -254,36 +248,29 @@ public interface DebugInfoProvider {
          * @return true if this method has been compiled in as a deoptimization target
          */
         boolean isDeoptTarget();
+
+        int getModifiers();
     }
 
     /**
      * Access details of a specific heap object.
      */
     interface DebugDataInfo {
+        void debugContext(Consumer<DebugContext> action);
+
+        String getProvenance();
+        String getTypeName();
+        String getPartition();
+        long getOffset();
+        long getAddress();
+        long getSize();
     }
 
     /**
      * Access details of code generated for a specific outer or inlined method at a given line
      * number.
      */
-    interface DebugLineInfo {
-        /**
-         * @return the name of the file containing the outer or inlined method excluding any path.
-         */
-        String fileName();
-
-        /**
-         * @return a relative path to the file containing the outer or inlined method derived from
-         *         its package name or null if the method is in the empty package.
-         */
-        Path filePath();
-
-        /**
-         * @return a relative path to the source cache containing the sources of a compiled method
-         *         or {@code null} if sources are not available.
-         */
-        Path cachePath();
-
+    interface DebugLineInfo extends DebugFileInfo {
         /**
          * @return the fully qualified name of the class owning the outer or inlined method.
          */

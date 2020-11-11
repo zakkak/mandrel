@@ -33,6 +33,7 @@ import org.graalvm.compiler.debug.DebugContext;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class InterfaceClassEntry extends ClassEntry {
     private List<ClassEntry> implementors;
@@ -55,5 +56,9 @@ public class InterfaceClassEntry extends ClassEntry {
     public void addImplementor(ClassEntry classEntry, DebugContext debugContext) {
         implementors.add(classEntry);
         debugContext.log("typename %s add implementor %s\n", typeName, classEntry.getTypeName());
+    }
+
+    public Stream<ClassEntry> implementors() {
+        return implementors.stream();
     }
 }

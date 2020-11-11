@@ -30,7 +30,12 @@ import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind;
 import org.graalvm.compiler.debug.DebugContext;
 
-import java.util.HashMap;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.ARRAY;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.ENUM;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.HEADER;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.INSTANCE;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.INTERFACE;
+import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind.PRIMITIVE;
 
 public abstract class TypeEntry {
     /**
@@ -57,33 +62,44 @@ public abstract class TypeEntry {
     }
 
     public abstract DebugTypeKind typeKind();
-    public abstract void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext);
+
+    public boolean isPrimitive() {
+        return typeKind() == PRIMITIVE;
+    }
+
+    public boolean isHeader() {
+        return typeKind() == HEADER;
+    }
+
+    public boolean isArray() {
+        return typeKind() == ARRAY;
+    }
+
+    public boolean isInstance() {
+        return typeKind() == INSTANCE;
+    }
+
+    public boolean isInterface() {
+        return typeKind() == INTERFACE;
+    }
+
+    public boolean isEnum() {
+        return typeKind() == ENUM;
+    }
 
     public boolean isClass() {
-        return false;
+        return isInstance() | isInterface() || isEnum();
     }
-    private static HashMap<String, String> canonicalizer = createCanonicalMap();
 
-    private static HashMap<String, String> createCanonicalMap() {
-        HashMap<String, String> map = new HashMap<>();
-        map.put("byte", "jbyte");
-        map.put("short", "jshort");
-        map.put("char", "jchar");
-        map.put("int", "jint");
-        map.put("long", "jlong");
-        map.put("float", "jfloat");
-        map.put("double", "jdouble");
-        map.put("boolean", "jboolean");
-        return map;
+    public boolean isStructure() {
+        return isClass() || isHeader();
     }
+
+    public abstract void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext);
 
     public static String canonicalize(String typeName) {
-        typeName = typeName.replace("$", ".");
-        String mappedTypeName = canonicalizer.get(typeName);
-        if (mappedTypeName != null) {
-            return mappedTypeName;
-        } else {
-            return typeName;
-        }
+        // typeName = typeName.replace('$', '.');
+        typeName = typeName.replace(" ", "__");
+        return typeName;
     }
 }

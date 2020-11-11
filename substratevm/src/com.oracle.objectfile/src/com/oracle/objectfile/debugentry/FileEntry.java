@@ -50,11 +50,21 @@ public class FileEntry {
     }
 
     public String getPathName() {
-        return getDirEntry().getPathString();
+        DirEntry dirEntry = getDirEntry();
+        if (dirEntry == null) {
+            return "";
+        } else {
+            return dirEntry.getPathString();
+        }
     }
 
     public String getFullName() {
-        return getDirEntry() != null ? getDirEntry().getPath().resolve(getFileName()).toString() : getFileName();
+        DirEntry dirEntry = getDirEntry();
+        if (dirEntry == null) {
+            return fileName;
+        } else {
+            return dirEntry.getPath().resolve(getFileName()).toString();
+        }
     }
 
     /**

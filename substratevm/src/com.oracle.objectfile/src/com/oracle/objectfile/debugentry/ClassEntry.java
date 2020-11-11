@@ -26,14 +26,13 @@
 
 package com.oracle.objectfile.debugentry;
 
-import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFieldInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFrameSizeChange;
+import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugMethodInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugInstanceTypeInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugTypeInfo.DebugTypeKind;
 import org.graalvm.compiler.debug.DebugContext;
 
-import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -43,7 +42,7 @@ import java.util.Map;
 /**
  * Track debug info associated with a Java class.
  */
-public class ClassEntry extends TypeEntry {
+public class ClassEntry extends StructureTypeEntry {
     /**
      * Details of this class's superclass.
      */
@@ -53,13 +52,13 @@ public class ClassEntry extends TypeEntry {
      */
     protected LinkedList<InterfaceClassEntry> interfaces;
     /**
-     * Details of fields located in this instance.
-     */
-    protected LinkedList<FieldEntry> fields;
-    /**
      * Details of the associated file.
      */
     private FileEntry fileEntry;
+    /**
+     * Details of methods located in this instance.
+     */
+    protected List<MethodEntry> methods;
     /**
      * A list recording details of all primary ranges included in this class sorted by ascending
      * address range.
@@ -86,27 +85,6 @@ public class ClassEntry extends TypeEntry {
      */
     private LinkedList<DirEntry> localDirs;
     /**
-     * index of debug_info section compilation unit for this class.
-     */
-    private int cuIndex;
-    /**
-     * index of debug_info section compilation unit for deopt target methods.
-     */
-    private int deoptCUIndex;
-    /**
-     * index into debug_line section for associated compilation unit.
-     */
-    private int lineIndex;
-    /**
-     * Size of line number info prologue region for associated compilation unit.
-     */
-    private int linePrologueSize;
-    /**
-     * Total size of line number info region for associated compilation unit.
-     */
-    private int totalSize;
-
-    /**
      * true iff the entry includes methods that are deopt targets.
      */
     private boolean includesDeoptTarget;
@@ -114,8 +92,8 @@ public class ClassEntry extends TypeEntry {
     public ClassEntry(String className, FileEntry fileEntry, int size) {
         super(className, size);
         this.interfaces = new LinkedList<>();
-        this.fields = new LinkedList<>();
         this.fileEntry = fileEntry;
+        this.methods = new LinkedList<>();
         this.primaryEntries = new LinkedList<>();
         this.primaryIndex = new HashMap<>();
         this.localFiles = new LinkedList<>();
@@ -131,15 +109,9 @@ public class ClassEntry extends TypeEntry {
                 localDirsIndex.put(dirEntry, localDirs.size());
             }
         }
-        this.cuIndex = -1;
-        this.deoptCUIndex = -1;
-        this.lineIndex = -1;
-        this.linePrologueSize = -1;
-        this.totalSize = -1;
-        this.includesDeoptTarget = false;
     }
 
-    public void addPrimary(Range primary, List<DebugFrameSizeChange> frameSizeInfos, int frameSize) {
+    public void indexPrimary(Range primary, List<DebugFrameSizeChange> frameSizeInfos, int frameSize) {
         if (primaryIndex.get(primary) == null) {
             PrimaryEntry primaryEntry = new PrimaryEntry(primary, frameSizeInfos, frameSize, this);
             primaryEntries.add(primaryEntry);
@@ -150,10 +122,13 @@ public class ClassEntry extends TypeEntry {
                 /* deopt targets should all come after normal methods */
                 assert includesDeoptTarget == false;
             }
+            FileEntry fileEntry = primary.getFileEntry();
+            assert fileEntry != null;
+            indexFileEntry(fileEntry);
         }
     }
 
-    public void addSubRange(Range subrange, FileEntry subFileEntry) {
+    public void indexSubRange(Range subrange) {
         Range primary = subrange.getPrimary();
         /*
          * the subrange should belong to a primary range
@@ -165,13 +140,18 @@ public class ClassEntry extends TypeEntry {
          */
         assert primaryEntry != null;
         assert primaryEntry.getClassEntry() == this;
-        primaryEntry.addSubRange(subrange, subFileEntry);
+        primaryEntry.addSubRange(subrange);
+        FileEntry subFileEntry = subrange.getFileEntry();
         if (subFileEntry != null) {
-            if (localFilesIndex.get(subFileEntry) == null) {
-                localFiles.add(subFileEntry);
-                localFilesIndex.put(subFileEntry, localFiles.size());
-            }
-            DirEntry dirEntry = subFileEntry.getDirEntry();
+            indexFileEntry(subFileEntry);
+        }
+    }
+
+    private void indexFileEntry(FileEntry fileEntry) {
+        if (localFilesIndex.get(fileEntry) == null) {
+            localFiles.add(fileEntry);
+            localFilesIndex.put(fileEntry, localFiles.size());
+            DirEntry dirEntry = fileEntry.getDirEntry();
             if (dirEntry != null && localDirsIndex.get(dirEntry) == null) {
                 localDirs.add(dirEntry);
                 localDirsIndex.put(dirEntry, localDirs.size());
@@ -217,56 +197,6 @@ public class ClassEntry extends TypeEntry {
         }
     }
 
-    public void setCUIndex(int cuIndex) {
-        // Should only get set once to a non-negative value.
-        assert cuIndex >= 0;
-        assert this.cuIndex == -1;
-        this.cuIndex = cuIndex;
-    }
-
-    public int getCUIndex() {
-        // Should have been set before being read.
-        assert cuIndex >= 0;
-        return cuIndex;
-    }
-
-    public void setDeoptCUIndex(int deoptCUIndex) {
-        // Should only get set once to a non-negative value.
-        assert deoptCUIndex >= 0;
-        assert this.deoptCUIndex == -1;
-        this.deoptCUIndex = deoptCUIndex;
-    }
-
-    public int getDeoptCUIndex() {
-        // Should have been set before being read.
-        assert deoptCUIndex >= 0;
-        return deoptCUIndex;
-    }
-
-    public int getLineIndex() {
-        return lineIndex;
-    }
-
-    public void setLineIndex(int lineIndex) {
-        this.lineIndex = lineIndex;
-    }
-
-    public void setLinePrologueSize(int linePrologueSize) {
-        this.linePrologueSize = linePrologueSize;
-    }
-
-    public int getLinePrologueSize() {
-        return linePrologueSize;
-    }
-
-    public int getTotalSize() {
-        return totalSize;
-    }
-
-    public void setTotalSize(int totalSize) {
-        this.totalSize = totalSize;
-    }
-
     public FileEntry getFileEntry() {
         return fileEntry;
     }
@@ -307,18 +237,13 @@ public class ClassEntry extends TypeEntry {
     }
 
     @Override
-    public boolean isClass() {
-        return true;
-    }
-
-    @Override
     public void addDebugInfo(DebugInfoBase debugInfoBase, DebugTypeInfo debugTypeInfo, DebugContext debugContext) {
         assert TypeEntry.canonicalize(debugTypeInfo.typeName()).equals(typeName);
         DebugInstanceTypeInfo debugInstanceTypeInfo = (DebugInstanceTypeInfo) debugTypeInfo;
         /* Add details of super and interface classes */
         String superName = debugInstanceTypeInfo.superName();
         if (superName != null) {
-            superName = superName.replace("$", ".");
+            superName = TypeEntry.canonicalize(superName);
         }
         debugContext.log("typename %s adding super %s\n", typeName, superName);
         if (superName != null) {
@@ -327,59 +252,91 @@ public class ClassEntry extends TypeEntry {
         debugInstanceTypeInfo.interfaces().forEach(interfaceName -> processInterface(interfaceName, debugInfoBase, debugContext));
         /* Add details of fields and field types */
         debugInstanceTypeInfo.fieldInfoProvider().forEach(debugFieldInfo -> this.processField(debugFieldInfo, debugInfoBase, debugContext));
+        /* Add details of methods and method types */
+        debugInstanceTypeInfo.methodInfoProvider().forEach(methodFieldInfo -> this.processMethod(methodFieldInfo, debugInfoBase, debugContext));
     }
 
     private void processInterface(String interfaceName, DebugInfoBase debugInfoBase, DebugContext debugContext) {
         debugContext.log("typename %s adding interface %s\n", typeName, interfaceName);
-        ClassEntry entry = debugInfoBase.lookupClassEntry(interfaceName.replace("$", "."));
+        ClassEntry entry = debugInfoBase.lookupClassEntry(TypeEntry.canonicalize(interfaceName));
         assert entry instanceof InterfaceClassEntry;
         InterfaceClassEntry interfaceClassEntry = (InterfaceClassEntry) entry;
         interfaces.add(interfaceClassEntry);
         interfaceClassEntry.addImplementor(this, debugContext);
     }
 
-    private void processField(DebugFieldInfo debugFieldInfo, DebugInfoBase debugInfoBase, DebugContext debugContext) {
-        String fieldName = debugFieldInfo.name();
-        String valueTypeName = TypeEntry.canonicalize(debugFieldInfo.valueType());
-        int size = debugFieldInfo.size();
-        int offset = debugFieldInfo.offset();
-        int modifiers = debugFieldInfo.modifiers();
-        debugContext.log("typename %s adding %s field %s type %s size %s at offset %d\n",
-                        typeName, memberModifiers(modifiers), fieldName, valueTypeName, size, offset);
-        TypeEntry valueType = debugInfoBase.lookupTypeEntry(valueTypeName);
-        fields.add(new FieldEntry(fieldName, this, valueType, size, offset, modifiers));
+    protected void processMethod(DebugMethodInfo debugMethodInfo, DebugInfoBase debugInfoBase, DebugContext debugContext) {
+        String methodName = debugInfoBase.uniqueDebugString(debugMethodInfo.name());
+        String resultTypeName = TypeEntry.canonicalize(debugMethodInfo.valueType());
+        int modifiers = debugMethodInfo.modifiers();
+        List<String> paramTypes = debugMethodInfo.paramTypes();
+        List<String> paramNames = debugMethodInfo.paramNames();
+        assert paramTypes.size() == paramNames.size();
+        int paramCount = paramTypes.size();
+        debugContext.log("typename %s adding %s method %s %s(%s)\n",
+                typeName, memberModifiers(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
+        TypeEntry resultType = debugInfoBase.lookupTypeEntry(resultTypeName);
+        TypeEntry[] paramTypeArray =  new TypeEntry[paramCount];
+        String[] paramNameArray = new String[paramCount];
+        int idx = 0;
+        for (String paramTypeName : paramTypes) {
+            TypeEntry paramType = debugInfoBase.lookupTypeEntry(TypeEntry.canonicalize(paramTypeName));
+            paramTypeArray[idx++] = paramType;
+        }
+        paramNameArray = paramNames.toArray(paramNameArray);
+        String fileName = debugMethodInfo.fileName();
+        Path filePath = debugMethodInfo.filePath();
+        Path cachePath = debugMethodInfo.cachePath();
+        // n.b. the method file may differ from the owning class file when the method is a substitution
+        FileEntry fileEntry = debugInfoBase.ensureFileEntry(fileName, filePath, cachePath);
+        methods.add(new MethodEntry(fileEntry, methodName, this, resultType, paramTypeArray, paramNameArray, modifiers));
     }
 
-    private String memberModifiers(int modifiers) {
+    private String formatParams(List<String> paramTypes, List<String> paramNames) {
+        if (paramNames.size() == 0) {
+            return "";
+        }
         StringBuilder builder = new StringBuilder();
-        if (Modifier.isPublic(modifiers)) {
-            builder.append("public ");
-        } else if (Modifier.isProtected(modifiers)) {
-            builder.append("protected ");
-        } else if (Modifier.isPrivate(modifiers)) {
-            builder.append("private ");
-        }
-        if (Modifier.isFinal(modifiers)) {
-            builder.append("final ");
-        }
-        if (Modifier.isAbstract(modifiers)) {
-            builder.append("abstract ");
-        } else if (Modifier.isVolatile(modifiers)) {
-            builder.append("volatile ");
-        } else if (Modifier.isTransient(modifiers)) {
-            builder.append("transient ");
-        } else if (Modifier.isSynchronized(modifiers)) {
-            builder.append("synchronized ");
-        }
-        if (Modifier.isNative(modifiers)) {
-            builder.append("native ");
-        }
-        if (Modifier.isStatic(modifiers)) {
-            builder.append("static");
-        } else {
-            builder.append("instance");
+        String separator = "";
+        for (int i = 0; i < paramNames.size(); i++) {
+            builder.append(separator);
+            builder.append(paramTypes.get(i));
+            String paramName = paramNames.get(i);
+            if (paramName.length() > 0) {
+                builder.append(' ');
+                builder.append(paramName);
+            }
+            separator = ", ";
         }
 
         return builder.toString();
+    }
+
+    public boolean isPrimary() {
+        return primaryEntries.size() != 0;
+    }
+
+    public ClassEntry getSuperClass() {
+        return superClass;
+    }
+
+    public Range makePrimaryRange(String methodName, String symbolName, String paramSignature, String returnTypeName, StringTable stringTable, FileEntry fileEntry, int lo, int hi, int primaryLine, int modifiers, boolean isDeoptTarget) {
+        // find the method for this range
+        for (MethodEntry methodEntry : methods) {
+            if (methodEntry.match(methodName, paramSignature, returnTypeName, isDeoptTarget)) {
+                // if no file was found for the compiled method try to default it
+                if (fileEntry == null) {
+                    // maybe the method's file entry
+                    fileEntry = methodEntry.getFileEntry();
+                    if (fileEntry == null) {
+                        // last chance is the class's file entry
+                        fileEntry = this.fileEntry;
+                    }
+                }
+                return new Range(this.typeName, methodName, symbolName, paramSignature, returnTypeName, stringTable, fileEntry, lo, hi, primaryLine, modifiers, isDeoptTarget);
+            }
+        }
+        assert false : "method not found " + returnTypeName + " " + methodName + "(" + paramSignature + ")";
+        return null;
     }
 }

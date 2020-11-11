@@ -42,7 +42,7 @@ public class ArrayTypeEntry extends TypeEntry {
 
     @Override
     public DebugTypeKind typeKind() {
-        return DebugTypeKind.PRIMITIVE;
+        return DebugTypeKind.ARRAY;
     }
 
     @Override
@@ -53,5 +53,9 @@ public class ArrayTypeEntry extends TypeEntry {
         this.headerSize = debugArrayTypeInfo.headerSize();
         this.lengthOffset = debugArrayTypeInfo.lengthOffset();
         debugContext.log("typename %s element type %s header size %d length offset %d\n", typeName, elementTypeName, headerSize, lengthOffset);
+    }
+
+    public TypeEntry getElementType() {
+        return elementType;
     }
 }

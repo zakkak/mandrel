@@ -26,20 +26,21 @@
 
 package com.oracle.objectfile.debugentry;
 
-public class FieldEntry {
-    private final String fieldName;
-    private final ClassEntry ownerClass;
-    private final TypeEntry valueType;
+public class FieldEntry extends MemberEntry {
     private final int size;
     private final int offset;
-    private final int modifiers;
 
-    public FieldEntry(String fieldName, ClassEntry ownerClass, TypeEntry valueType, int size, int offset, int modifiers) {
-        this.fieldName = fieldName;
-        this.ownerClass = ownerClass;
-        this.valueType = valueType;
+    public FieldEntry(FileEntry fileEntry, String fieldName, StructureTypeEntry ownerType, TypeEntry valueType, int size, int offset, int modifiers) {
+        super(fileEntry, fieldName, ownerType, valueType, modifiers);
         this.size = size;
         this.offset = offset;
-        this.modifiers = modifiers;
+    }
+
+    public int getSize() {
+        return size;
+    }
+
+    public int getOffset() {
+        return offset;
     }
 }
