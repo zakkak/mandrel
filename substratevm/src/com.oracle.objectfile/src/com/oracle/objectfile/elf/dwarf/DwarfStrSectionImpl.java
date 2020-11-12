@@ -72,13 +72,13 @@ public class DwarfStrSectionImpl extends DwarfSectionImpl {
 
         enableLog(context, pos);
 
-        // log(context, "  [0x%08x] DEBUG_STR", pos);
+        verboseLog(context, " [0x%08x] DEBUG_STR", pos);
         for (StringEntry stringEntry : dwarfSections.getStringTable()) {
             if (stringEntry.isAddToStrSection()) {
                 assert stringEntry.getOffset() == pos;
                 String string = stringEntry.getString();
                 pos = putAsciiStringBytes(string, buffer, pos);
-                // log(context, "  [0x%08x] string = %s", pos, string);
+                verboseLog(context, " [0x%08x] string = %s", pos, string);
             }
         }
         assert pos == size;

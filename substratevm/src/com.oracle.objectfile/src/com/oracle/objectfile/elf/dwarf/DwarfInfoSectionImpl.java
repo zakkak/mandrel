@@ -214,9 +214,9 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         pos = writeArrayTypes(context, buffer, pos);
 
         /*
-         * write extra special CUs for deopt targets. these are written out of line from
-         * the class because they are compiled later and hence inhabit a range
-         * that extends beyond the normal method address range.
+         * write extra special CUs for deopt targets. these are written out of line from the class
+         * because they are compiled later and hence inhabit a range that extends beyond the normal
+         * method address range.
          */
         for (ClassEntry classEntry : getPrimaryClasses()) {
             if (classEntry.includesDeoptTarget()) {
@@ -254,24 +254,24 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         // write child entries for basic Java types
 
         pos = getTypes().filter(TypeEntry::isPrimitive).reduce(pos,
-                (p, typeEntry) -> {
-                    PrimitiveTypeEntry primitiveTypeEntry = (PrimitiveTypeEntry) typeEntry;
-                    if (primitiveTypeEntry.getBitCount() > 0) {
-                        return writePrimitiveType(context, primitiveTypeEntry, buffer, p);
-                    } else {
-                        return writeVoidType(context, primitiveTypeEntry, buffer, p);
-                    }
-                },
-                (oldpos, newpos) -> newpos);
+                        (p, typeEntry) -> {
+                            PrimitiveTypeEntry primitiveTypeEntry = (PrimitiveTypeEntry) typeEntry;
+                            if (primitiveTypeEntry.getBitCount() > 0) {
+                                return writePrimitiveType(context, primitiveTypeEntry, buffer, p);
+                            } else {
+                                return writeVoidType(context, primitiveTypeEntry, buffer, p);
+                            }
+                        },
+                        (oldpos, newpos) -> newpos);
 
         // write child entries for object header and array header structs
 
         pos = getTypes().filter(TypeEntry::isHeader).reduce(pos,
-                (p, typeEntry) -> {
-                    HeaderTypeEntry headerTypeEntry = (HeaderTypeEntry) typeEntry;
-                    return writeHeaderType(context, headerTypeEntry, buffer, p);
-                },
-                (oldpos, newpos) -> newpos);
+                        (p, typeEntry) -> {
+                            HeaderTypeEntry headerTypeEntry = (HeaderTypeEntry) typeEntry;
+                            return writeHeaderType(context, headerTypeEntry, buffer, p);
+                        },
+                        (oldpos, newpos) -> newpos);
 
         // terminate with null entry
 
@@ -345,8 +345,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
 
     private int writeHeaderFields(DebugContext context, HeaderTypeEntry headerTypeEntry, byte[] buffer, int p) {
         return headerTypeEntry.fields().reduce(p,
-                (pos, fieldEntry) -> writeHeaderField(context, fieldEntry, buffer, pos),
-                (oldPos, newPos) -> newPos);
+                        (pos, fieldEntry) -> writeHeaderField(context, fieldEntry, buffer, pos),
+                        (oldPos, newPos) -> newPos);
     }
 
     private int writeHeaderField(DebugContext context, FieldEntry fieldEntry, byte[] buffer, int p) {
@@ -375,11 +375,11 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
     private int writeNonPrimaryClasses(DebugContext context, byte[] buffer, int pos) {
         log(context, "  [0x%08x] non primary classes", pos);
         return getTypes().filter(TypeEntry::isClass).reduce(pos,
-                (p, typeEntry) -> {
-                    ClassEntry classEntry = (ClassEntry) typeEntry;
-                    return (classEntry.isPrimary() ? p : writeNonPrimaryClassUnit(context, classEntry, buffer, p));
-                },
-                (oldpos, newpos) -> newpos);
+                        (p, typeEntry) -> {
+                            ClassEntry classEntry = (ClassEntry) typeEntry;
+                            return (classEntry.isPrimary() ? p : writeNonPrimaryClassUnit(context, classEntry, buffer, p));
+                        },
+                        (oldpos, newpos) -> newpos);
 
     }
 
@@ -442,11 +442,11 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
     private int writePrimaryClasses(DebugContext context, byte[] buffer, int pos) {
         log(context, "  [0x%08x] primary classes", pos);
         return getTypes().filter(TypeEntry::isClass).reduce(pos,
-                (p, typeEntry) -> {
-                    ClassEntry classEntry = (ClassEntry) typeEntry;
-                    return (classEntry.isPrimary() ? writePrimaryClassUnit(context, classEntry, buffer, p) : p);
-                },
-                (oldpos, newpos) -> newpos);
+                        (p, typeEntry) -> {
+                            ClassEntry classEntry = (ClassEntry) typeEntry;
+                            return (classEntry.isPrimary() ? writePrimaryClassUnit(context, classEntry, buffer, p) : p);
+                        },
+                        (oldpos, newpos) -> newpos);
     }
 
     private int writePrimaryClassUnit(DebugContext context, ClassEntry classEntry, byte[] buffer, int p) {
@@ -584,7 +584,7 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
     private int writeField(DebugContext context, ClassEntry classEntry, FieldEntry fieldEntry, byte[] buffer, int p) {
         int pos = p;
         int modifiers = fieldEntry.getModifiers();
-        boolean hasFile =  classEntry.getFileName().length() > 0;
+        boolean hasFile = classEntry.getFileName().length() > 0;
         log(context, "  [0x%08x] field definition", pos);
         int abbrevCode;
         boolean isStatic = Modifier.isStatic(modifiers);
@@ -643,7 +643,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         LinkedList<PrimaryEntry> classPrimaryEntries = classEntry.getPrimaryEntries();
         for (PrimaryEntry primaryEntry : classPrimaryEntries) {
             Range range = primaryEntry.getPrimary();
-            // declare all methods including deopt targets even though they are written in separate CUs.
+            // declare all methods including deopt targets even though they are written in separate
+            // CUs.
             pos = writeMethodDeclaration(context, classEntry, range, buffer, pos);
         }
 
@@ -701,7 +702,7 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
     private int writeMethodParameterDeclarations(DebugContext context, ClassEntry classEntry, Range range, boolean isSpecification, byte[] buffer, int p) {
         int pos = p;
         if (!Modifier.isStatic(range.getModifiers())) {
-           pos = writeMethodParameterDeclaration(context, "this", classEntry.getTypeName(), true, isSpecification, buffer, pos);
+            pos = writeMethodParameterDeclaration(context, "this", classEntry.getTypeName(), true, isSpecification, buffer, pos);
         }
         String paramsString = range.getParamSignature();
         if (!paramsString.isEmpty()) {
@@ -732,9 +733,6 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         }
         log(context, "  [0x%08x] <%d> Abbrev Number %d", pos, level, abbrevCode);
         pos = writeAbbrevCode(abbrevCode, buffer, pos);
-        // we don't have parameter names for now
-        // log(context, "  [0x%08x]     name  0x%x (%s)", pos, debugStringIndex(name), name);
-        // pos = writeAttrStrp(name, buffer, pos);
         // an artificial 'this' parameter has to be typed using the raw pointer type.
         // other parameters can be typed using the typedef that retains the Java type name
         int typeIdx = (artificial ? getPointerIndex(paramTypeName) : getTypeIndex(paramTypeName));
@@ -744,8 +742,6 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
             log(context, "  [0x%08x]     artificial true", pos);
             pos = writeFlag((byte) 1, buffer, pos);
         }
-        // we don't currently have a way of defining parameter var locations
-        // pos = writeMethodParamLocation(location, buffer, pos);
         return pos;
     }
 
@@ -775,9 +771,10 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
 
     private int writeInterfaceImplementors(DebugContext context, InterfaceClassEntry interfaceClassEntry, byte[] buffer, int p) {
         return interfaceClassEntry.implementors().reduce(p,
-                (pos, classEntry) -> writeInterfaceImplementor(context, classEntry, buffer, pos),
-                (oldPos, newPos) -> newPos);
+                        (pos, classEntry) -> writeInterfaceImplementor(context, classEntry, buffer, pos),
+                        (oldPos, newPos) -> newPos);
     }
+
     private int writeInterfaceImplementor(DebugContext context, ClassEntry classEntry, byte[] buffer, int p) {
         int pos = p;
         log(context, "  [0x%08x] interface implementor", pos);
@@ -878,8 +875,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         // a negative offset indicates that the field has been folded into code as
         // an unmaterialized constant.
         return classEntry.fields().filter(DwarfInfoSectionImpl::isManifestedStaticField).reduce(p,
-                (pos, fieldEntry) -> writeStaticFieldLocation(context, classEntry, fieldEntry, buffer, pos),
-                (oldPos, newPos) -> newPos);
+                        (pos, fieldEntry) -> writeStaticFieldLocation(context, classEntry, fieldEntry, buffer, pos),
+                        (oldPos, newPos) -> newPos);
     }
 
     private static boolean isManifestedStaticField(FieldEntry fieldEntry) {
@@ -938,11 +935,11 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
     private int writeArrayTypes(DebugContext context, byte[] buffer, int pos) {
         log(context, "  [0x%08x] array classes", pos);
         return getTypes().filter(TypeEntry::isArray).reduce(pos,
-                (p, typeEntry) -> {
-                    ArrayTypeEntry arrayTypeEntry = (ArrayTypeEntry) typeEntry;
-                    return writeArrayTypeUnit(context, arrayTypeEntry, buffer, p);
-                },
-                (oldpos, newpos) -> newpos);
+                        (p, typeEntry) -> {
+                            ArrayTypeEntry arrayTypeEntry = (ArrayTypeEntry) typeEntry;
+                            return writeArrayTypeUnit(context, arrayTypeEntry, buffer, p);
+                        },
+                        (oldpos, newpos) -> newpos);
     }
 
     private int writeArrayTypeUnit(DebugContext context, ArrayTypeEntry arrayTypeEntry, byte[] buffer, int p) {
@@ -1051,7 +1048,7 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         } else {
             headerName = ARRAY_HEADER_STRUCT_NAME + "A";
         }
-        int headerTypeOffset =  getTypeIndex(headerName);
+        int headerTypeOffset = getTypeIndex(headerName);
         log(context, "  [0x%08x] super reference", pos);
         int abbrevCode = DW_ABBREV_CODE_super_reference;
         log(context, "  [0x%08x] <2> Abbrev Number %d", pos, abbrevCode);

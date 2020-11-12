@@ -167,8 +167,7 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * For the moment we only use one abbrev table for all CUs. It contains the
-         * following DIES:
+         * For the moment we only use one abbrev table for all CUs. It contains the following DIES:
          *
          * <ul>
          *
@@ -176,11 +175,13 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li><code>code = null, TAG = null<code> - empty terminator
          *
-         * <li><code>code = builtin_unit, TAG = compile_unit<code> - Java primitive and header type compile unit
+         * <li><code>code = builtin_unit, TAG = compile_unit<code> - Java primitive and header type
+         * compile unit
          *
-         * <li><code>code = class_unit1/2, tag  = compile_unit<code> - Java instance type compile unit
+         * <li><code>code = class_unit1/2, tag = compile_unit<code> - Java instance type compile
+         * unit
          *
-         * <li><code>code = array_unit*, tag  = compile_unit<code> - Java array type compile unit
+         * <li><code>code = array_unit, tag = compile_unit<code> - Java array type compile unit
          *
          * </ul>
          *
@@ -188,27 +189,44 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li>Level 1 DIES
          *
-         * <li><code>code = primitive_type, tag  = base_type<code> - Java primitive type (non-void)
+         * <li><code>code = primitive_type, tag = base_type<code> - Java primitive type (non-void)
          *
-         * <li><code>code = void_type, tag  = unspecified_type<code> - Java void type
+         * <li><code>code = void_type, tag = unspecified_type<code> - Java void type
          *
-         * <li><code>code = object_header, tag  = structure_type<code> - Java object header
+         * <li><code>code = object_header, tag = structure_type<code> - Java object header
          *
-         * <li><code>code = class_layout, tag  = class_type, parent = class_unit<code> - Java instance type structure definition
+         * <li><code>code = class_layout, tag = class_type, parent = class_unit<code> - Java
+         * instance type structure definition
          *
-         * <li><code>code = class_pointer, tag  = pointer_type, parent = class_unit<code> - Java instance ref type
+         * <li><code>code = class_pointer, tag = pointer_type, parent = class_unit<code> - Java
+         * instance ref type
          *
-         * <li><code>code = method_location, tag  = subprogram , parent = class_unit<code> - Java method code definition
+         * <li><code>code = class_typedef, tag = typedef, parent = class_unit<code> - Java instance
+         * ref typedef
          *
-         * <li><code>code = static_field_location, tag  = variable, parent = class_unit<code> - Java static field location
+         * <li><code>code = method_location, tag = subprogram , parent = class_unit<code> - Java
+         * method code definition (i.e. location of code)
          *
-         * <li><code>code = array_layout, tag  = structure_type, parent = array_unit<code> - Java array type structure definition
+         * <li><code>code = static_field_location, tag = variable, parent = class_unit<code> - Java
+         * static field definition (i.e. location of data)
          *
-         * <li><code>code = array_pointer, tag  = pointer_type, parent = array_unit<code> - Java array ref type
+         * <li><code>code = array_layout, tag = structure_type, parent = array_unit<code> - Java
+         * array type structure definition
          *
-         * <li><code>code = interface_layout, tag  = union_type, parent = class_unit<code> - Java array type structure definition
+         * <li><code>code = array_pointer, tag = pointer_type, parent = array_unit<code> - Java
+         * array ref type
          *
-         * <li><code>code = interface_pointer, tag  = pointer_type, parent = class_unit<code> - Java interface ref type
+         * <li><code>code = array_typedef, tag = typedef, parent = array_unit<code> - Java array ref
+         * typedef
+         *
+         * <li><code>code = interface_layout, tag = union_type, parent = class_unit<code> - Java
+         * array type structure definition
+         *
+         * <li><code>code = interface_pointer, tag = pointer_type, parent = class_unit<code> - Java
+         * interface ref type
+         *
+         * <li><code>code = interface_typedef, tag = typedef, parent = class_unit<code> - Java array
+         * ref typedef
          *
          * </ul>
          *
@@ -216,25 +234,33 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li> Level 2 DIEs
          *
-         * <li><code>code = header_field, tag  = member, parent = object_header, array_header<code> - object/array header field
-         *
-         * <li><code>code = field_declaration, tag  = member, parent = array_header<code> - object header field
+         * <li><code>code = header_field, tag = member, parent = object_header<code> - object/array
+         * header field
          *
          * <li><code>code == method_declaration1/2, tag == subprogram, parent = class_layout</code>
          *
-         * <li><code>code == static_field_location, tag == member, parent = class_layout</code>
+         * <li><code>code = field_declaration1/2/3/4, tag = member, parent =
+         * object_header/class_layout<code> - object header or instance field declaration (i.e.
+         * specification of properties)
          *
-         * <li><code>code == super_reference, tag == inheritance, parent = class_layout</code>
+         * <li><code>code == super_reference, tag == inheritance, parent =
+         * class_layout/array_layout</code> - reference to super class layout or to appropriate
+         * header struct for {code java.lang.Object} or arrays.
+         *
+         * <li><code>code == interface_implementor, tag == member, parent = interface_layout</code>
+         * - union member typed using class layout of a given implementing class
          *
          * </ul>
          *
          * <li> Level 2/3 DIEs
          *
-         * <li><code>code == method_parameter_declaration, tag == formal_parameter, parent = method_declaration1/2, method_location</code>
+         * <li><code>code == method_parameter_declaration1/2/3, tag == formal_parameter, parent =
+         * method_declaration1/2, method_location</code> - details of method parameters
          *
          * Details of each specific DIE contents are as follows:
          *
-         * Primitive Types: For each non-void Java primitive type there is a level 0 DIE defining a base type
+         * Primitive Types: For each non-void Java primitive type there is a level 0 DIE defining a
+         * base type
          *
          * <ul>
          *
@@ -260,36 +286,27 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * Header: There are two level 0 DIEs defining structure types used to define the various types
-         * of header structure embedded at the start of every instance or array. The first DIE describes
-         * the header used for instances. A separate DIE is used to describe array headers, one for each
-         * JavaKind (Void and Illegal excluded). The multiplicity of array headers is required to allow
-         * for the different amounts of padding required between the header data and the array element
-         * data.
+         * Header: There is a level 0 DIE defining structure types used to define the various types
+         * of header structure embedded at the start of every instance or array. All instances embed
+         * the same object header. Array headers embed the object header as a parent type, allowing
+         * an array to be viewed as a type of object. Multiple array headers structures are defined
+         * to allow for the possibility of different amounts of padding required between the array
+         * header fields and the array elements that are allocate at the end of the header. Child
+         * DIEs are employed to define the name, type and layout of fields in each header.
          *
          * <ul>
          *
          * <li><code>abbrev_code == object_header, tag == DW_TAG_structure_type, has_children</code>
          *
-         * <li><code>DW_AT_name  : .........  DW_FORM_strp</code> "oop"
+         * <li><code>DW_AT_name : ......... DW_FORM_strp</code> "oop"
          *
-         * <li><code>DW_AT_byte_size  : ...  DW_FORM_data1</code> "oop"
-         *
-         * </ul>
-         *
-         * <ul>
-         *
-         * <li><code>abbrev_code == array_header, tag == DW_TAG_structure_type, has_children</code>
-         *
-         * <li><code>DW_AT_name  : ........  DW_FORM_strp</code> "oop"
-         *
-         * <li><code>DW_AT_byte_size  : ...  DW_FORM_data1</code> "oop"
+         * <li><code>DW_AT_byte_size : ... DW_FORM_data1</code> "oop"
          *
          * </ul>
          *
-         * Header Data: A level 1 DIE of type member is used to describe the fields of both object and
-         * array headers. This includes the type tag and other tag bits in all objects, the length field
-         * in all arrays and any padding bytes needed to complete the layout.
+         * Header Data: A level 1 DIE of type member is used to describe the fields of both object
+         * and array headers. This includes the type tag and other tag bits in all objects, the
+         * length field in all arrays and any padding bytes needed to complete the layout.
          *
          * <ul>
          *
@@ -305,11 +322,13 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * Instance Classes: For each class there is a level 0 DIE defining the class compilation unit
+         * Instance Classes: For each class there is a level 0 DIE defining the class compilation
+         * unit
          *
          * <ul>
          *
-         * <li><code>abbrev_code == class_unit1/2, tag == DW_TAG_compilation_unit, has_children</code>
+         * <li><code>abbrev_code == class_unit1/2, tag == DW_TAG_compilation_unit,
+         * has_children</code>
          *
          * <li><code>DW_AT_language : ... DW_FORM_data1</code>
          *
@@ -317,16 +336,19 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li><code>DW_AT_comp_dir : ... DW_FORM_strp</code>
          *
-         * <li><code>DW_AT_low_pc : ..... DW_FORM_address</code> ??? omit this so method entries do not need to occupy full range
+         * <li><code>DW_AT_low_pc : ..... DW_FORM_address</code> ??? omit this so method entries do
+         * not need to occupy full range
          *
-         * <li><code>DW_AT_hi_pc : ...... DW_FORM_address</code> ??? omit this so method entries do not need to occupy full range
+         * <li><code>DW_AT_hi_pc : ...... DW_FORM_address</code> ??? omit this so method entries do
+         * not need to occupy full range
          *
-         * <li><code>DW_AT_stmt_list : .. DW_FORM_data4</code> n.b only for <code>abbrev-code == class_unit1</code>
+         * <li><code>DW_AT_stmt_list : .. DW_FORM_data4</code> n.b only for <code>abbrev-code ==
+         * class_unit1</code>
          *
          * </ul>
          *
-         * Instance Class Structure: Each class_unit DIE contains a series of level 1 DIEs. The first one describes the
-         * class layout:
+         * Instance Class Structure: Each class_unit DIE contains a series of level 1 DIEs. The
+         * first one describes the class layout:
          *
          * <ul>
          *
@@ -334,11 +356,14 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li><code>Dw_AT_name : ........ DW_FORM_strp</code>
          *
-         * <li><code>Dw_AT_byte_size : ... DW_FORM_data1/2</code> ??? how many bytes do we really need?
+         * <li><code>Dw_AT_byte_size : ... DW_FORM_data1/2</code> ??? how many bytes do we really
+         * need?
          *
-         * <li><code>Dw_AT_decl_file : ... DW_FORM_data1/2</code> ??? how many bytes do we really need?
+         * <li><code>Dw_AT_decl_file : ... DW_FORM_data1/2</code> ??? how many bytes do we really
+         * need?
          *
-         * <li><code>Dw_AT_decl_line : ... DW_FORM_data1/2</code> ??? how many bytes do we really need?
+         * <li><code>Dw_AT_decl_line : ... DW_FORM_data1/2</code> ??? how many bytes do we really
+         * need?
          *
          * <li><code>Dw_AT_containing_type : ..... DW_FORM_ref_addr</code>
          *
@@ -348,8 +373,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          * the class's methods and fields. The first type declares a method but omits details of the
          * location of the code that implements the method. The second type declares an instance or
          * static field. The class_layout DIE also contains an level 2 DIE specifying the type from
-         * which it inherits superclass structure. In the case of class Object structure is inherited
-         * from the object header structure type.
+         * which it inherits superclass structure. In the case of class Object structure is
+         * inherited from the object header structure type.
          *
          * n.b. Code implementation details for each method are provided in an auxiliary level 1
          * method_location DIE that follows the class_unit DIE. Instance field declarations need no
@@ -359,7 +384,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <ul>
          *
-         * <li><code>abbrev_code == method_declaration1/2, tag == DW_TAG_subprogram, has_children</code>
+         * <li><code>abbrev_code == method_declaration1/2, tag == DW_TAG_subprogram,
+         * has_children</code>
          *
          * <li><code>DW_AT_external : .......... DW_FORM_flag</code> ??? for all?
          *
@@ -379,35 +405,42 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li><code>DW_AT_declaration : ....... DW_FORM_flag</code>
          *
-         * <li><code>Dw_AT_object_pointer : .... DW_FORM_ref_addr<code> (only for method_declaration1 points to param 0 DIE)
+         * <li><code>Dw_AT_object_pointer : .... DW_FORM_ref_addr<code> (only for
+         * method_declaration1 points to param 0 DIE)
          *
          * <li><code>DW_AT_virtuality : ........ DW_FORM_data1<code> (for override methods)
          *
-         * <li><code>DW_AT_containing_type : ... DW_FORM_ref_addr</code>  (for override methods)
+         * <li><code>DW_AT_containing_type : ... DW_FORM_ref_addr</code> (for override methods)
          *
          * </ul>
          *
          * <ul>
          *
-         * <li><code>abbrev_code == field_declaration1/2/3/4, tag == DW_TAG_member, no_children</code>
+         * <li><code>abbrev_code == field_declaration1/2/3/4, tag == DW_TAG_member,
+         * no_children</code>
          *
          * <li><code>Dw_AT_name : ................... DW_FORM_strp</code>
          *
-         * <li><code>DW_AT_decl_file : .............. DW_FORM_data1/2</code> (only for field_declaration2/4)
+         * <li><code>DW_AT_decl_file : .............. DW_FORM_data1/2</code> (only for
+         * field_declaration2/4)
          *
-         * <li><code>DW_AT_decl_line : .............. DW_FORM_data1/2</code>  (only for field_declaration2/4)
+         * <li><code>DW_AT_decl_line : .............. DW_FORM_data1/2</code> (only for
+         * field_declaration2/4)
          *
          * <li><code>Dw_AT_type : ................... DW_FORM_ref_addr</code>
          *
-         * <li><code>Dw_AT_data_member_location : ... DW_FORM_data1/2</code> (only for field_declaration1/2 instance) ??? how many bytes?
+         * <li><code>Dw_AT_data_member_location : ... DW_FORM_data1/2</code> (only for
+         * field_declaration1/2 instance) ??? how many bytes?
          *
          * <li><code>Dw_AT_artificial : ............. DW_FORM_flag</code> ?? do we need this?
          *
          * <li><code>Dw_AT_accessibility : .......... DW_FORM_data1</code>
          *
-         * <li><code>Dw_AT_external : ............... DW_FORM_flag</code> (only for field_declaration3/4 static)
+         * <li><code>Dw_AT_external : ............... DW_FORM_flag</code> (only for
+         * field_declaration3/4 static)
          *
-         * <li><code>Dw_AT_declaration : ............ DW_FORM_flag</code> (only for field_declaration3/4 static)
+         * <li><code>Dw_AT_declaration : ............ DW_FORM_flag</code> (only for
+         * field_declaration3/4 static)
          *
          * </ul>
          *
@@ -423,31 +456,41 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * Method Parameters: Level 2 method_declaration DIEs may include level 3 DIEs that
-         * describe their parameters
+         * Method Parameters: Level 2 method_declaration DIEs may include level 3 DIEs that describe
+         * their parameters
          *
          * <ul>
          *
-         * <li><code>abbrev_code == method_parameter_declaration1/2/3, tag == DW_TAG_formal_parameter, no_children</code>
+         * <li><code>abbrev_code == method_parameter_declaration1/2/3, tag ==
+         * DW_TAG_formal_parameter, no_children</code>
          *
          * <li><code>Dw_AT_name : ... DW_FORM_strp</code> (may be empty string)
          *
-         * <li><code>Dw_AT_file : ... DW_FORM_data1/2</code> (optional only for method_parameter_declaration2)
+         * <li><code>Dw_AT_file : ... DW_FORM_data1/2</code> (optional only for
+         * method_parameter_declaration2)
          *
-         * <li><code>Dw_AT_line : ... DW_FORM_data1/2</code> (optional only for method_parameter_declaration2)
+         * <li><code>Dw_AT_line : ... DW_FORM_data1/2</code> (optional only for
+         * method_parameter_declaration2)
          *
          * <li><code>Dw_AT_type : ... DW_FORM_ref_addr</code>
          *
-         * <li><code>Dw_AT_artificial : ... DW_FORM_flag</code> (optional only for method_parameter_declaration1 $this, $access)
+         * <li><code>Dw_AT_artificial : ... DW_FORM_flag</code> (optional only for
+         * method_parameter_declaration1 $this, $access)
          *
          * <li><code>Dw_AT_location(list???) : ... DW_FORM_exprloc</code>
          *
          * </ul>
          *
-         * Instance Class Reference Types: The level 1 class_unit DIE is followed by a DIE defining the
-         * Java type name as a pointer to the class. n.b. the name used in the class_layout DIE is not
-         * the Java class name. It is derived by appending '_' to the Java class name (after the package
-         * prefix).
+         * Instance Class Reference Types: A level 1 class_layout DIE is followed by a DIE defining
+         * a pointer to the class and a second DIE that defines a typedef for that pointer using the
+         * Java class name as the typedef name. This reflects the fact that a Java object reference
+         * is actually implemented as a pointer.
+         *
+         * n.b. the name used in the class_layout DIE is not the Java class name. It is derived by
+         * appending '_' to the Java class name (preceding the package prefix). So this means that,
+         * for example, the Java type java.lang.Object appears to gdb to be defined as follows
+         *
+         * <code>typedef struct _java.lang.Object { ... } *java.lang.Object;</code>
          *
          * <ul>
          *
@@ -459,16 +502,28 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * Method Code Locations: For each method within a class there is a corresponding level 1 DIE
-         * providing details of the location of the compiled code for the method. This DIE should inherit
-         * attributes from the method_definition DIE referenced from its specification attribute without
-         * the need to repeat them, including attributes specified in child DIEs of the method_definition.
-         * However, it is actually necessary to replicate the method_parameter DIEs as children of this
-         * DIE because gdb does not carry these attributes across from the specification DIE.
+         * <ul>
+         *
+         * <li><code>abbrev_code == class_typedef, tag == DW_TAG_typedef, no_children</code>
+         *
+         * <li><code>Dw_AT_name : ... DW_FORM_strp</code>
+         *
+         * <li><code>Dw_AT_type : ........ DW_FORM_ref_addr</code>
+         *
+         * </ul>
+         *
+         * Method Code Locations: For each method within a class there is a corresponding level 1
+         * DIE providing details of the location of the compiled code for the method. This DIE
+         * should inherit attributes from the method_definition DIE referenced from its
+         * specification attribute without the need to repeat them, including attributes specified
+         * in child DIEs of the method_definition. However, it is actually necessary to replicate
+         * the method_parameter DIEs as children of this DIE because gdb does not carry these
+         * attributes across from the specification DIE.
          *
          * <ul>
          *
-         * <li><code>abbrev_code == DW_ABBREV_CODE_method_location, tag == DW_TAG_subprogram, has_children</code>
+         * <li><code>abbrev_code == DW_ABBREV_CODE_method_location, tag == DW_TAG_subprogram,
+         * has_children</code>
          *
          * <li><code>DW_AT_low_pc : .......... DW_FORM_addr</code>
          *
@@ -485,7 +540,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <ul>
          *
-         * <li><code>abbrev_code == static_field_location, tag == DW_TAG_variable, no_children</code>
+         * <li><code>abbrev_code == static_field_location, tag == DW_TAG_variable,
+         * no_children</code>
          *
          * <li><code>DW_AT_specification : ... DW_FORM_ref_addr</code>
          *
@@ -507,8 +563,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * Array Structure: Each array_unit DIE contains three level 1 DIEs. The first one describes the
-         * array layout:
+         * Array Structure: Each array_unit DIE contains three level 1 DIEs. The first one describes
+         * the array layout:
          *
          * <ul>
          *
@@ -516,11 +572,13 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * <li><code>Dw_AT_name : ........ DW_FORM_strp</code>
          *
-         * <li><code>Dw_AT_byte_size : ... DW_FORM_data1/2</code> size up to base of embedded array elements?
+         * <li><code>Dw_AT_byte_size : ... DW_FORM_data1/2</code> size up to base of embedded array
+         * elements?
          *
          * </ul>
          *
-         * The second DIE defines the array reference type as a pointer to the underlying structure type
+         * The second DIE defines the array reference type as a pointer to the underlying structure
+         * type
          *
          * <ul>
          *
@@ -542,10 +600,17 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
+         * n.b. the name used in the array_layout DIE is not the Java array name. It is derived by
+         * appending '_' to the Java array name (preceding the package prefix). So this means that,
+         * for example, the Java type java.lang.String[] appears to gdb to be defined as follows
+         *
+         * <code>typedef struct _java.lang.String[] { ... } *java.lang.String[];</code>
+         *
          * Array members: The level 1 array_layout DIE includes level 2 child DIEs with tag member
-         * that describe the layout of the array. A header_field DIE is used to declare both the array
-         * header and array contents members. An auxiliary array_data_type DIE with tag array_type is
-         * also needed to declare a type for the zero length element array that follows the array header.
+         * that describe the layout of the array. header_field DIEs are used to declare members of
+         * the array header, including the zero length array data member tat dfollows other header
+         * fields. An auxiliary array_data_type DIE with tag array_type also occurs as a child DIE
+         * defining the type for the array data member.
          *
          * <ul>
          *
@@ -560,11 +625,18 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          * Interfaces: For each interface there is a level 0 class_unit DIE defining the interface
          * compilation unit.
          *
-         * Interface Layout and Reference Types: The level 0 class_unit DIE for an interface is followed by a
-         * level 1 DIE defining the interface layout as a union of all the layouts for the classes
-         * which implement the interface. The name of the layout is derived by appending '_' to the
-         * Java class name for the interface (after the package prefix). A second level 1 DIE is used to
-         * define the Java type name as a pointer to this layout type.
+         * Interface Layout and Reference Types: The level 0 class_unit DIE for an interface is
+         * followed by a level 1 DIE defining the interface layout as a union of all the layouts for
+         * the classes which implement the interface. Two more level 1 DIEs define the a pointer to
+         * this layout type and a typedef that names the interface pointer type using the Java
+         * interface name.
+         *
+         * n.b. the name used in the interface_layout DIE is not the Java interface name. It is
+         * derived by appending '_' to the Java class name (preceding the package prefix). So this
+         * means that, for example, the Java interface java.lang.CharSequence appears to gdb to be
+         * defined as follows
+         *
+         * <code>typedef union _java.lang.CharSequence { ... } *java.lang.CharSequence; </code>
          *
          * <ul>
          *
@@ -584,8 +656,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          *
          * </ul>
          *
-         * The union type embeds level 2 DIEs with tag member whose name fields are are _1, _2 etc
-         * and whose types are the corresponding implementor reference types.
+         * The union type embeds level 2 DIEs with tag member. There is a member for each
+         * implementing class, typed using the layout.
          *
          * <ul>
          *
@@ -598,6 +670,13 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
          * <li><code>Dw_AT_accessibility : .......... DW_FORM_data1</code>
          *
          * </ul>
+         *
+         * The member name is constructed by appending an '_' to the Java* name of the implementing
+         * class. So, this means that, for example, the Java interface java.lang.CharSequence will
+         * include members for String, StringBuffer etc as follows
+         *
+         * <code>typedef union _java.lang.CharSequence { _java.lang.String _java.lang.String;
+         * _java.lang.StringBuffer _java.lang.StringBuffer; ... } *java.lang.CharSequence;</code>
          *
          */
 
@@ -998,7 +1077,6 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
         return pos;
     }
 
-
     private int writeInterfaceLayoutAbbrev(DebugContext context, byte[] buffer, int p) {
         int pos = p;
 
@@ -1014,7 +1092,6 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
         pos = writeAttrForm(DW_FORM_null, buffer, pos);
         return pos;
     }
-
 
     private int writeInterfaceReferenceAbbrev(DebugContext context, byte[] buffer, int p) {
         int pos = p;

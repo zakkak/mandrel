@@ -72,7 +72,6 @@ import org.graalvm.compiler.debug.DebugContext;
 import org.graalvm.compiler.graph.NodeSourcePosition;
 import org.graalvm.nativeimage.ImageSingletons;
 
-
 import jdk.vm.ci.meta.JavaKind;
 import jdk.vm.ci.meta.LineNumberTable;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
@@ -112,50 +111,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         // offsets need to be adjusted relative to the heap base plus partition-specific offset
         primitiveStartOffset = (int) primitiveFields.getOffset();
         referenceStartOffset = (int) objectFields.getOffset();
-        // validateDebugInfo();
     }
-
-    /*
-    private void validateDebugInfo() {
-        Collection<HostedType> allTypes = heap.getUniverse().getTypes();
-        Collection<HostedMethod> allMethods = heap.getUniverse().getMethods();
-        Collection<HostedMethod> compiledMethods = codeCache.compilations.keySet();
-        Collection<HostedType> allMethodTypes = allMethods.stream().map(method -> { return method.getDeclaringClass(); }).sorted().distinct().collect(Collectors.toSet());
-        Collection<HostedType> allCompiledTypes = compiledMethods.stream().map(method -> { return method.getDeclaringClass(); }).sorted().distinct().collect(Collectors.toSet());
-        int fail = 0;
-
-        for (HostedType type : allTypes) {
-            if (allCompiledTypes.contains(type)) {
-                System.out.format("compiled method declared by universe type %s (%s)\n", type.getName(), type.getWrapped().getWrappedWithoutResolve());
-            } else if (allMethodTypes.contains(type)) {
-                System.out.format("uncompiled method declared by universe type %s (%s)\n", type.getName(), type.getWrapped().getWrappedWithoutResolve());
-            } else {
-               System.out.format("no method method declared by universe type %s (%s)\n", type.getName(), type.getWrapped().getWrappedWithoutResolve());
-            }
-        }
-
-        for (HostedMethod hostedMethod : allMethods) {
-            HostedType declaringClass = hostedMethod.getDeclaringClass();
-            if (allTypes.contains(declaringClass)) {
-                System.out.format("universe type %s (%s) found for method %s\n", declaringClass.getName(), declaringClass.getWrapped().getWrappedWithoutResolve(), hostedMethod.getName());
-            } else {
-                System.out.format("no universe type %s (%s) for method %s\n", declaringClass.getName(), declaringClass.getWrapped().getWrappedWithoutResolve(), hostedMethod.getName());
-                fail++;
-            }
-        }
-        for (HostedMethod compiledMethod : compiledMethods) {
-            HostedType declaringClass = compiledMethod.getDeclaringClass();
-            if (allTypes.contains(declaringClass)) {
-                System.out.format("universe type %s (%s) found for compiled method %s\n", declaringClass.getName(), declaringClass.getWrapped().getWrappedWithoutResolve(), compiledMethod.getName());
-            } else {
-                System.out.format("no universe type %s (%s) for compiled method %s\n", declaringClass.getName(), declaringClass.getWrapped().getWrappedWithoutResolve(), compiledMethod.getName());
-                fail++;
-            }
-        }
-
-        assert fail == 0 : "validate debug info failure";
-    }
-    */
 
     @Override
     public boolean useHeapBase() {
@@ -183,14 +139,14 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
     /*
      * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
-     * getSourceFilename to the wrapped class so for consistency we need to do type names
-     * and path lookup relative to the doubly unwrapped HostedType.
+     * getSourceFilename to the wrapped class so for consistency we need to do type names and path
+     * lookup relative to the doubly unwrapped HostedType.
      *
      * However, note that the result of the unwrap on the AnalysisType may be a SubstitutionType
      * which wraps both an original type and the annotated type that substitutes it. Unwrapping
-     * normally returns the AnnotatedType which we need to use to resolve the file name. However,
-     * we need to use the original to name the owning type to ensure that names found in method
-     * param and return types resolve correctly.
+     * normally returns the AnnotatedType which we need to use to resolve the file name. However, we
+     * need to use the original to name the owning type to ensure that names found in method param
+     * and return types resolve correctly.
      */
     protected static ResolvedJavaType getJavaType(HostedType hostedType, boolean wantOriginal) {
         ResolvedJavaType javaType;
@@ -202,9 +158,9 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             } else if (javaType instanceof CustomSubstitutionType<?, ?>) {
                 return ((CustomSubstitutionType<?, ?>) javaType).getOriginal();
             } else if (javaType instanceof LambdaSubstitutionType) {
-                return  ((LambdaSubstitutionType) javaType).getOriginal();
+                return ((LambdaSubstitutionType) javaType).getOriginal();
             } else if (javaType instanceof InjectedFieldsType) {
-                return  ((InjectedFieldsType) javaType).getOriginal();
+                return ((InjectedFieldsType) javaType).getOriginal();
             } else {
                 return javaType;
             }
@@ -222,9 +178,9 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             } else if (javaType instanceof CustomSubstitutionType<?, ?>) {
                 return ((CustomSubstitutionType<?, ?>) javaType).getOriginal();
             } else if (javaType instanceof LambdaSubstitutionType) {
-                return  ((LambdaSubstitutionType) javaType).getOriginal();
+                return ((LambdaSubstitutionType) javaType).getOriginal();
             } else if (javaType instanceof InjectedFieldsType) {
-                return  ((InjectedFieldsType) javaType).getOriginal();
+                return ((InjectedFieldsType) javaType).getOriginal();
             }
             // check for replacement of the original method only
             ResolvedJavaMethod javaMethod = hostedMethod.getWrapped().getWrapped();
@@ -249,9 +205,9 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             } else if (javaType instanceof CustomSubstitutionType<?, ?>) {
                 return ((CustomSubstitutionType<?, ?>) javaType).getOriginal();
             } else if (javaType instanceof LambdaSubstitutionType) {
-                return  ((LambdaSubstitutionType) javaType).getOriginal();
+                return ((LambdaSubstitutionType) javaType).getOriginal();
             } else if (javaType instanceof InjectedFieldsType) {
-                return  ((InjectedFieldsType) javaType).getOriginal();
+                return ((InjectedFieldsType) javaType).getOriginal();
             }
             // check for replacement of the original field only
             ResolvedJavaField javaField = hostedField.wrapped.wrapped;
@@ -527,9 +483,9 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         int hubOffset = OBJECTLAYOUT.getHubOffset();
         int referenceSize = OBJECTLAYOUT.getReferenceSize();
         int hubFieldSize = referenceSize;
-        String hubTypeName =  "java.lang.Class";
+        String hubTypeName = "java.lang.Class";
         int arrayLengthOffset = OBJECTLAYOUT.getArrayLengthOffset();
-        int arrayLengthSize =  OBJECTLAYOUT.sizeInBytes(JavaKind.Int);
+        int arrayLengthSize = OBJECTLAYOUT.sizeInBytes(JavaKind.Int);
         int arrayIdHashOffset = OBJECTLAYOUT.getArrayIdentityHashcodeOffset();
         int arrayIdHashSize = OBJECTLAYOUT.sizeInBytes(JavaKind.Int);
         int objHeaderSize = OBJECTLAYOUT.getFirstFieldOffset();
@@ -541,7 +497,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         // create a header for each
         for (JavaKind arrayKind : ARRAY_KINDS) {
-            String name =  "_arrhdr" + arrayKind.getTypeChar();
+            String name = "_arrhdr" + arrayKind.getTypeChar();
             int headerSize = OBJECTLAYOUT.getArrayBaseOffset(arrayKind);
             NativeImageHeaderTypeInfo arrHeader = new NativeImageHeaderTypeInfo(name, headerSize, arrayKind);
             arrHeader.addField("hub", hubTypeName, hubOffset, hubFieldSize);
@@ -1157,10 +1113,10 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             size = objectInfo.getSize();
             provenance = objectInfo.toString();
             /*
-                 * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
-                 * getSourceFilename to the wrapped class so for consistency we need to do the type name
-                 * and path lookup relative to the doubly unwrapped HostedType.
-                 */
+             * HostedType wraps an AnalysisType and both HostedType and AnalysisType punt calls to
+             * getSourceFilename to the wrapped class so for consistency we need to do the type name
+             * and path lookup relative to the doubly unwrapped HostedType.
+             */
             javaType = hostedClass.getWrapped().getWrappedWithoutResolve();
             if (hostedClass instanceof OriginalClassProvider) {
                 clazz = ((OriginalClassProvider) hostedClass).getJavaClass();
@@ -1169,6 +1125,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             }
             typeName = hostedClass.toJavaName();
         }
+
         // accessors
         public String getProvenance() {
             return provenance;
@@ -1199,6 +1156,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         // this rejects filler partition objects
         return (objectInfo.getPartition().getStartOffset() > 0);
     }
+
     private DebugDataInfo createDebugDataInfo(ObjectInfo objectInfo) {
         return new NativeImageDebugDataInfo(objectInfo);
     }

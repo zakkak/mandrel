@@ -84,6 +84,7 @@ public abstract class DwarfSectionImpl extends BasicProgbitsSectionImpl {
     /**
      * Check whether the contents byte array has been sized and created. n.b. this does not imply
      * that data has been written to the byte array.
+     * 
      * @return true if the contents byte array has been sized and created otherwise false.
      */
     public boolean contentByteArrayCreated() {
@@ -426,17 +427,6 @@ public abstract class DwarfSectionImpl extends BasicProgbitsSectionImpl {
         LayoutDecision ourContent = decisions.get(getElement()).getDecision(LayoutDecision.Kind.CONTENT);
         LayoutDecision ourSize = decisions.get(getElement()).getDecision(LayoutDecision.Kind.SIZE);
         LayoutDecision.Kind[] targetKinds = targetSectionKinds();
-        /*
-         * Make our content depend on the size and content of the target.
-         */
-        // for (LayoutDecision.Kind targetKind : targetKinds) {
-        //     LayoutDecision targetDecision = decisions.get(targetSection).getDecision(targetKind);
-        //     deps.add(BuildDependency.createOrGet(ourContent, targetDecision));
-        // }
-        /*
-         * Make our size depend on our content.
-         */
-        // deps.add(BuildDependency.createOrGet(ourSize, ourContent));
 
         for (LayoutDecision.Kind targetKind : targetKinds) {
             if (targetKind == LayoutDecision.Kind.SIZE) {
@@ -571,18 +561,22 @@ public abstract class DwarfSectionImpl extends BasicProgbitsSectionImpl {
     protected void setLayoutIndex(ClassEntry classEntry, int pos) {
         dwarfSections.setLayoutIndex(classEntry, pos);
     }
+
     protected void setFieldDeclarationIndex(ClassEntry classEntry, String fieldName, int pos) {
         dwarfSections.setFieldDeclarationIndex(classEntry, fieldName, pos);
     }
+
     protected int getFieldDeclarationIndex(ClassEntry classEntry, String fieldName) {
         if (!contentByteArrayCreated()) {
             return 0;
         }
         return dwarfSections.getFieldDeclarationIndex(classEntry, fieldName);
     }
+
     protected void setMethodDeclarationIndex(ClassEntry classEntry, String methodName, int pos) {
         dwarfSections.setMethodDeclarationIndex(classEntry, methodName, pos);
     }
+
     protected int getMethodDeclarationIndex(ClassEntry classEntry, String methodName) {
         if (!contentByteArrayCreated()) {
             return 0;

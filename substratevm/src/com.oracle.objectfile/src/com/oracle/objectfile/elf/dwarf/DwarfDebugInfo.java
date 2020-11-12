@@ -73,33 +73,32 @@ public class DwarfDebugInfo extends DebugInfoBase {
     public static final int DW_ABBREV_CODE_primitive_type = 5;
     public static final int DW_ABBREV_CODE_void_type = 6;
     public static final int DW_ABBREV_CODE_object_header = 7;
-    @SuppressWarnings("unused") public static final int DW_ABBREV_CODE_array_header = 8;
-    public static final int DW_ABBREV_CODE_class_layout = 9;
-    public static final int DW_ABBREV_CODE_class_pointer = 10;
-    public static final int DW_ABBREV_CODE_class_typedef = 11;
-    public static final int DW_ABBREV_CODE_method_declaration1 = 12;
-    public static final int DW_ABBREV_CODE_method_declaration2 = 13;
-    public static final int DW_ABBREV_CODE_field_declaration1 = 14;
-    public static final int DW_ABBREV_CODE_field_declaration2 = 15;
-    public static final int DW_ABBREV_CODE_field_declaration3 = 16;
-    public static final int DW_ABBREV_CODE_field_declaration4 = 17;
-    public static final int DW_ABBREV_CODE_array_layout = 18;
-    public static final int DW_ABBREV_CODE_array_pointer = 19;
-    public static final int DW_ABBREV_CODE_array_typedef = 20;
-    public static final int DW_ABBREV_CODE_interface_layout = 21;
-    public static final int DW_ABBREV_CODE_interface_pointer = 22;
-    public static final int DW_ABBREV_CODE_interface_typedef = 23;
+    public static final int DW_ABBREV_CODE_class_layout = 8;
+    public static final int DW_ABBREV_CODE_class_pointer = 9;
+    public static final int DW_ABBREV_CODE_class_typedef = 10;
+    public static final int DW_ABBREV_CODE_method_location = 11;
+    public static final int DW_ABBREV_CODE_static_field_location = 12;
+    public static final int DW_ABBREV_CODE_array_layout = 13;
+    public static final int DW_ABBREV_CODE_array_pointer = 14;
+    public static final int DW_ABBREV_CODE_array_typedef = 15;
+    public static final int DW_ABBREV_CODE_interface_layout = 16;
+    public static final int DW_ABBREV_CODE_interface_pointer = 17;
+    public static final int DW_ABBREV_CODE_interface_typedef = 18;
     // level 2 DIEs
-    public static final int DW_ABBREV_CODE_header_field = 24;
-    public static final int DW_ABBREV_CODE_array_data_type = 25;
-    public static final int DW_ABBREV_CODE_method_location = 26;
-    public static final int DW_ABBREV_CODE_static_field_location = 27;
-    public static final int DW_ABBREV_CODE_super_reference = 28;
-    public static final int DW_ABBREV_CODE_interface_implementor = 29;
+    public static final int DW_ABBREV_CODE_method_declaration1 = 19;
+    public static final int DW_ABBREV_CODE_method_declaration2 = 20;
+    public static final int DW_ABBREV_CODE_field_declaration1 = 21;
+    public static final int DW_ABBREV_CODE_field_declaration2 = 22;
+    public static final int DW_ABBREV_CODE_field_declaration3 = 23;
+    public static final int DW_ABBREV_CODE_field_declaration4 = 24;
+    public static final int DW_ABBREV_CODE_header_field = 25;
+    public static final int DW_ABBREV_CODE_array_data_type = 26;
+    public static final int DW_ABBREV_CODE_super_reference = 27;
+    public static final int DW_ABBREV_CODE_interface_implementor = 28;
     // level 3 DIEs
-    public static final int DW_ABBREV_CODE_method_parameter_declaration1 = 30;
-    public static final int DW_ABBREV_CODE_method_parameter_declaration2 = 31;
-    public static final int DW_ABBREV_CODE_method_parameter_declaration3 = 32;
+    public static final int DW_ABBREV_CODE_method_parameter_declaration1 = 29;
+    public static final int DW_ABBREV_CODE_method_parameter_declaration2 = 30;
+    public static final int DW_ABBREV_CODE_method_parameter_declaration3 = 31;
     /*
      * Define all the Dwarf tags we need for our DIEs.
      */
@@ -262,10 +261,9 @@ public class DwarfDebugInfo extends DebugInfoBase {
     private byte threadRegister;
 
     /**
-     * A collection of properties associated with each generated type record
-     * indexed by type name. n.b. this collection includes entries for the
-     * structure types used to define the object and array headers which do
-     * not have an associated TypeEntry.
+     * A collection of properties associated with each generated type record indexed by type name.
+     * n.b. this collection includes entries for the structure types used to define the object and
+     * array headers which do not have an associated TypeEntry.
      */
     private HashMap<String, DwarfTypeProperties> propertiesIndex;
 
@@ -322,8 +320,8 @@ public class DwarfDebugInfo extends DebugInfoBase {
     }
 
     /**
-     * A class used to associate properties with a specific type, the
-     * most important one being its index in the info section.
+     * A class used to associate properties with a specific type, the most important one being its
+     * index in the info section.
      */
     static class DwarfTypeProperties {
         /**
@@ -355,8 +353,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
     }
 
     /**
-     * A class used to associate extra properties with an instance
-     * class type.
+     * A class used to associate extra properties with an instance class type.
      */
 
     static class DwarfClassProperties extends DwarfTypeProperties {
@@ -373,7 +370,8 @@ public class DwarfDebugInfo extends DebugInfoBase {
          */
         private int layoutIndex;
         /**
-         * Index of the class entry's pointer type for the class_layout DIE in the debug_info section.
+         * Index of the class entry's pointer type for the class_layout DIE in the debug_info
+         * section.
          */
         private int pointerIndex;
         /**
@@ -445,7 +443,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
     private DwarfClassProperties lookupClassProperties(ClassEntry classEntry) {
         String typeName = classEntry.getTypeName();
         DwarfTypeProperties typeProperties = propertiesIndex.get(typeName);
-        assert typeProperties == null || typeProperties instanceof  DwarfClassProperties;
+        assert typeProperties == null || typeProperties instanceof DwarfClassProperties;
         DwarfClassProperties classProperties = (DwarfClassProperties) typeProperties;
         if (classProperties == null) {
             classProperties = addClassProperties(classEntry);
@@ -596,7 +594,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
         DwarfClassProperties classProperties;
         classProperties = lookupClassProperties(classEntry);
         assert classProperties.getTypeEntry() == classEntry;
-        HashMap<String, Integer> fieldDeclarationIndex =  classProperties.fieldDeclarationIndex;
+        HashMap<String, Integer> fieldDeclarationIndex = classProperties.fieldDeclarationIndex;
         if (fieldDeclarationIndex == null) {
             classProperties.fieldDeclarationIndex = fieldDeclarationIndex = new HashMap<>();
         }
@@ -611,7 +609,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
         DwarfClassProperties classProperties;
         classProperties = lookupClassProperties(classEntry);
         assert classProperties.getTypeEntry() == classEntry;
-        HashMap<String, Integer> fieldDeclarationIndex =  classProperties.fieldDeclarationIndex;
+        HashMap<String, Integer> fieldDeclarationIndex = classProperties.fieldDeclarationIndex;
         assert fieldDeclarationIndex != null;
         assert fieldDeclarationIndex.get(fieldName) != null;
         return fieldDeclarationIndex.get(fieldName);
@@ -621,7 +619,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
         DwarfClassProperties classProperties;
         classProperties = lookupClassProperties(classEntry);
         assert classProperties.getTypeEntry() == classEntry;
-        HashMap<String, Integer> methodDeclarationIndex =  classProperties.methodDeclarationIndex;
+        HashMap<String, Integer> methodDeclarationIndex = classProperties.methodDeclarationIndex;
         if (methodDeclarationIndex == null) {
             classProperties.methodDeclarationIndex = methodDeclarationIndex = new HashMap<>();
         }
@@ -636,7 +634,7 @@ public class DwarfDebugInfo extends DebugInfoBase {
         DwarfClassProperties classProperties;
         classProperties = lookupClassProperties(classEntry);
         assert classProperties.getTypeEntry() == classEntry;
-        HashMap<String, Integer> methodDeclarationIndex =  classProperties.methodDeclarationIndex;
+        HashMap<String, Integer> methodDeclarationIndex = classProperties.methodDeclarationIndex;
         assert methodDeclarationIndex != null;
         assert methodDeclarationIndex.get(methodName) != null;
         return methodDeclarationIndex.get(methodName);

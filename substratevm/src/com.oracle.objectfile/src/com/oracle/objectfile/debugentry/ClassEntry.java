@@ -274,9 +274,9 @@ public class ClassEntry extends StructureTypeEntry {
         assert paramTypes.size() == paramNames.size();
         int paramCount = paramTypes.size();
         debugContext.log("typename %s adding %s method %s %s(%s)\n",
-                typeName, memberModifiers(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
+                        typeName, memberModifiers(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
         TypeEntry resultType = debugInfoBase.lookupTypeEntry(resultTypeName);
-        TypeEntry[] paramTypeArray =  new TypeEntry[paramCount];
+        TypeEntry[] paramTypeArray = new TypeEntry[paramCount];
         String[] paramNameArray = new String[paramCount];
         int idx = 0;
         for (String paramTypeName : paramTypes) {
@@ -287,7 +287,8 @@ public class ClassEntry extends StructureTypeEntry {
         String fileName = debugMethodInfo.fileName();
         Path filePath = debugMethodInfo.filePath();
         Path cachePath = debugMethodInfo.cachePath();
-        // n.b. the method file may differ from the owning class file when the method is a substitution
+        // n.b. the method file may differ from the owning class file when the method is a
+        // substitution
         FileEntry fileEntry = debugInfoBase.ensureFileEntry(fileName, filePath, cachePath);
         methods.add(new MethodEntry(fileEntry, methodName, this, resultType, paramTypeArray, paramNameArray, modifiers));
     }
@@ -320,7 +321,8 @@ public class ClassEntry extends StructureTypeEntry {
         return superClass;
     }
 
-    public Range makePrimaryRange(String methodName, String symbolName, String paramSignature, String returnTypeName, StringTable stringTable, FileEntry fileEntry, int lo, int hi, int primaryLine, int modifiers, boolean isDeoptTarget) {
+    public Range makePrimaryRange(String methodName, String symbolName, String paramSignature, String returnTypeName, StringTable stringTable, FileEntry fileEntry, int lo, int hi, int primaryLine,
+                    int modifiers, boolean isDeoptTarget) {
         // find the method for this range
         for (MethodEntry methodEntry : methods) {
             if (methodEntry.match(methodName, paramSignature, returnTypeName, isDeoptTarget)) {

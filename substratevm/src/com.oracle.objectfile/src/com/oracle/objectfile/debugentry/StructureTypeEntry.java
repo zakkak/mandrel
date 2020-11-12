@@ -36,9 +36,8 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * An intermediate type that provides behaviour for managing fields.
- * This unifies code for handling header structures and Java instance
- * classes that both support data members.
+ * An intermediate type that provides behaviour for managing fields. This unifies code for handling
+ * header structures and Java instance classes that both support data members.
  */
 public abstract class StructureTypeEntry extends TypeEntry {
     /**
@@ -67,7 +66,8 @@ public abstract class StructureTypeEntry extends TypeEntry {
         String fileName = debugFieldInfo.fileName();
         Path filePath = debugFieldInfo.filePath();
         Path cachePath = debugFieldInfo.cachePath();
-        // n.b. the field file may differ from the owning class file when the field is a substitution
+        // n.b. the field file may differ from the owning class file when the field is a
+        // substitution
         FileEntry fileEntry = debugInfoBase.ensureFileEntry(fileName, filePath, cachePath);
         fields.add(new FieldEntry(fileEntry, fieldName, this, valueType, size, offset, modifiers));
     }

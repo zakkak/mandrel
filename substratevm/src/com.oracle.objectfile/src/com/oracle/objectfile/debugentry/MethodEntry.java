@@ -33,32 +33,38 @@ public class MethodEntry extends MemberEntry {
     public MethodEntry(FileEntry fileEntry, String methodName, ClassEntry ownerType, TypeEntry valueType, TypeEntry[] paramTypes, String[] paramNames, int modifiers) {
         super(fileEntry, methodName, ownerType, valueType, modifiers);
         assert ((paramTypes == null && paramNames == null) ||
-                (paramTypes != null && paramNames != null && paramTypes.length == paramNames.length));
+                        (paramTypes != null && paramNames != null && paramTypes.length == paramNames.length));
         this.paramTypes = paramTypes;
         this.paramNames = paramNames;
     }
+
     public String methodName() {
         return memberName;
     }
+
     @Override
     public ClassEntry ownerType() {
         assert ownerType instanceof ClassEntry;
         return (ClassEntry) ownerType;
     }
+
     public int getParamCount() {
         return (paramTypes == null ? 0 : paramTypes.length);
     }
+
     public TypeEntry getParamType(int idx) {
         assert paramTypes != null;
         assert idx < paramTypes.length;
         return paramTypes[idx];
     }
+
     public String getParamTypeName(int idx) {
         assert paramTypes != null;
         assert idx < paramTypes.length;
         assert paramTypes[idx] != null;
         return paramTypes[idx].getTypeName();
     }
+
     public String getParamName(int idx) {
         assert paramNames != null;
         assert idx < paramNames.length;

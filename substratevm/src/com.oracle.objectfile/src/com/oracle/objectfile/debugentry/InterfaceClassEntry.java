@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 
 public class InterfaceClassEntry extends ClassEntry {
     private List<ClassEntry> implementors;
+
     public InterfaceClassEntry(String className, FileEntry fileEntry, int size) {
         super(className, fileEntry, size);
         implementors = new LinkedList<>();

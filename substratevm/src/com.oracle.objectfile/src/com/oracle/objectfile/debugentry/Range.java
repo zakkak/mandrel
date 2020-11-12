@@ -194,6 +194,7 @@ public class Range {
     public FileEntry getFileEntry() {
         return fileEntry;
     }
+
     public void setFileEntry(FileEntry fileEntry) {
         this.fileEntry = fileEntry;
     }

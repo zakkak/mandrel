@@ -109,8 +109,8 @@ public abstract class DebugInfoBase {
      */
     private LinkedList<FileEntry> files = new LinkedList<>();
     /**
-     * Flag set to true if heap references are stored as addresses relative to
-     * a heap base register otherwise false.
+     * Flag set to true if heap references are stored as addresses relative to a heap base register
+     * otherwise false.
      */
     private boolean useHeapBase;
 
@@ -214,15 +214,15 @@ public abstract class DebugInfoBase {
             });
         }));
 
-       debugInfoProvider.dataInfoProvider().forEach(debugDataInfo -> debugDataInfo.debugContext((debugContext) -> {
-           String provenance = debugDataInfo.getProvenance();
-           String typeName = debugDataInfo.getTypeName();
-           String partitionName = debugDataInfo.getPartition();
-           // address is heap-register relative pointer
-           long address = debugDataInfo.getAddress();
-           long size = debugDataInfo.getSize();
+        debugInfoProvider.dataInfoProvider().forEach(debugDataInfo -> debugDataInfo.debugContext((debugContext) -> {
+            String provenance = debugDataInfo.getProvenance();
+            String typeName = debugDataInfo.getTypeName();
+            String partitionName = debugDataInfo.getPartition();
+            // address is heap-register relative pointer
+            long address = debugDataInfo.getAddress();
+            long size = debugDataInfo.getSize();
             debugContext.log(DebugContext.INFO_LEVEL, "Data: address 0x%x size 0x%x type %s partition %s provenance %s ", address, size, typeName, partitionName, provenance);
-       }));
+        }));
     }
 
     private TypeEntry createTypeEntry(String typeName, String fileName, Path filePath, Path cachePath, int size, DebugTypeKind typeKind) {

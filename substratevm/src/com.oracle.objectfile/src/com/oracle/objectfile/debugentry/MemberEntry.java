@@ -26,11 +26,9 @@
 
 package com.oracle.objectfile.debugentry;
 
-import java.nio.file.Path;
-
 /**
- * An abstract class providing modelling a generic class member which includes
- * behaviour and data shared by both field and method entries.
+ * An abstract class providing modelling a generic class member which includes behaviour and data
+ * shared by both field and method entries.
  */
 public abstract class MemberEntry {
     protected FileEntry fileEntry;

@@ -41,7 +41,7 @@ public interface DebugInfoProvider {
     boolean useHeapBase();
 
     /**
-     * An interface implemented by items that can be located in a file
+     * An interface implemented by items that can be located in a file.
      */
     interface DebugFileInfo {
         /**
@@ -51,13 +51,13 @@ public interface DebugInfoProvider {
 
         /**
          * @return a relative path to the file containing a file element derived from its package
-         *         name or null if the element is in the empty package.
+         *         name or {@code null} if the element is in the empty package.
          */
         Path filePath();
 
         /**
-         * @return a relative path to the source cache containing the cached source file of a
-         *         file element or {@code null} if sources are not available.
+         * @return a relative path to the source cache containing the cached source file of a file
+         *         element or {@code null} if sources are not available.
          */
         Path cachePath();
     }
@@ -132,7 +132,7 @@ public interface DebugInfoProvider {
 
     interface DebugPrimitiveTypeInfo extends DebugTypeInfo {
         /*
-         * NUMERIC excludes LOGICAL types  boolean and void
+         * NUMERIC excludes LOGICAL types boolean and void
          */
         int FLAG_NUMERIC = 1 << 0;
         /*
@@ -259,10 +259,15 @@ public interface DebugInfoProvider {
         void debugContext(Consumer<DebugContext> action);
 
         String getProvenance();
+
         String getTypeName();
+
         String getPartition();
+
         long getOffset();
+
         long getAddress();
+
         long getSize();
     }
 
