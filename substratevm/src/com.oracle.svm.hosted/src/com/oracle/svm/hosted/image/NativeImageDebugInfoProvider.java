@@ -37,6 +37,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import com.oracle.graal.pointsto.infrastructure.OriginalClassProvider;
+import com.oracle.graal.pointsto.infrastructure.OriginalMethodProvider;
+import com.oracle.graal.pointsto.meta.AnalysisMethod;
 import com.oracle.graal.pointsto.meta.AnalysisType;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider;
 
@@ -48,6 +50,8 @@ import com.oracle.svm.core.graal.code.SubstrateBackend;
 import com.oracle.svm.core.image.ImageHeapPartition;
 import com.oracle.svm.hosted.annotation.CustomSubstitutionMethod;
 import com.oracle.svm.hosted.annotation.CustomSubstitutionType;
+import com.oracle.svm.hosted.code.CCallStubMethod;
+import com.oracle.svm.hosted.code.CEntryPointCallStubMethod;
 import com.oracle.svm.hosted.image.NativeImageHeap.ObjectInfo;
 import com.oracle.svm.hosted.image.sources.SourceManager;
 import com.oracle.svm.hosted.lambda.LambdaSubstitutionType;
@@ -843,13 +847,15 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String methodName() {
-            String name = hostedMethod.format("%n");
-            if ("<init>".equals(name)) {
-                ResolvedJavaMethod unwrapped = hostedMethod.getWrapped().getWrapped();
-                if (unwrapped instanceof SubstitutionMethod) {
-                    unwrapped = ((SubstitutionMethod) unwrapped).getOriginal();
-                }
-                name = unwrapped.format("%h");
+            ResolvedJavaMethod targetMethod = hostedMethod.getWrapped().getWrapped();
+            if (targetMethod instanceof SubstitutionMethod){
+                targetMethod = ((SubstitutionMethod) targetMethod).getOriginal();
+            } else if (targetMethod instanceof CustomSubstitutionMethod) {
+                targetMethod = ((CustomSubstitutionMethod) targetMethod).getOriginal();
+            }
+            String name = targetMethod.getName();
+            if (name.equals("<init>")) {
+                name = targetMethod.format("%h");
                 if (name.indexOf('$') >= 0) {
                     name = name.substring(name.lastIndexOf('$') + 1);
                 }
@@ -991,13 +997,21 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String methodName() {
-            String name = method.format("%n");
-            if ("<init>".equals(name)) {
-                if (method instanceof SubstitutionMethod) {
-                    name = ((SubstitutionMethod) method).getOriginal().format("%h");
-                } else {
-                    name = method.format("%h");
-                }
+            ResolvedJavaMethod targetMethod = method;
+            if (targetMethod instanceof HostedMethod) {
+                targetMethod = ((HostedMethod) targetMethod).getWrapped();
+            }
+            if (targetMethod instanceof AnalysisMethod) {
+                targetMethod = ((AnalysisMethod) targetMethod).getWrapped();
+            }
+            if (targetMethod instanceof SubstitutionMethod){
+                targetMethod = ((SubstitutionMethod) targetMethod).getOriginal();
+            } else if (targetMethod instanceof CustomSubstitutionMethod) {
+                targetMethod = ((CustomSubstitutionMethod) targetMethod).getOriginal();
+            }
+            String name = targetMethod.getName();
+            if (name.equals("<init>")) {
+                name = targetMethod.format("%h");
                 if (name.indexOf('$') >= 0) {
                     name = name.substring(name.lastIndexOf('$') + 1);
                 }
