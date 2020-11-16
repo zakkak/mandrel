@@ -1,14 +1,26 @@
-name: Nightly quarkus tests
+name: Quarkus tests
 
 on:
   push:
-    paths:
-      - '.github/workflows/quarkus.yml'
+    paths-ignore:
+      - 'README.md'
+      - 'README-Mandrel.md'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.travis.yml'
   pull_request:
-    paths:
-      - '.github/workflows/quarkus.yml'
-  schedule:
-  - cron: '0 3 * * *'
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'docs/src/main/asciidoc/**'
+      - 'README.md'
+      - 'README-Mandrel.md'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.travis.yml'
 
 env:
   # Workaround testsuite locale issue
@@ -16,95 +28,137 @@ env:
   DB_USER: hibernate_orm_test
   DB_PASSWORD: hibernate_orm_test
   DB_NAME: hibernate_orm_test
-  NATIVE_TEST_MAVEN_OPTS: "-B --settings ${GITHUB_WORKSPACE}/quarkus/.github/mvn-settings.xml --fail-at-end -Dtest-postgresql -Dtest-elasticsearch -Dtest-keycloak -Dtest-amazon-services -Dtest-db2 -Dtest-mysql -Dtest-mariadb -Dmariadb.base_url='jdbc:mariadb://localhost:3308' -Dmariadb.url='jdbc:mariadb://localhost:3308/hibernate_orm_test'  -Dtest-mssql -Dtest-vault -Dtest-neo4j -Dtest-kafka -Dtest-redis -Dnative-image.xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install"
+  NATIVE_TEST_MAVEN_OPTS: "-B --settings .github/mvn-settings.xml --fail-at-end -Dquarkus.native.additional-build-args=-J-ea -Dtest-postgresql -Dtest-elasticsearch -Delasticsearch.hosts='localhost:9200' -Dtest-keycloak -Dtest-amazon-services -Dtest-db2 -Dtest-mysql -Dtest-mariadb -Dmariadb.base_url='jdbc:mariadb://localhost:3308' -Dmariadb.url='jdbc:mariadb://localhost:3308/hibernate_orm_test'  -Dtest-mssql -Dtest-vault -Dtest-neo4j -Dtest-kafka -Dtest-redis -Dnative-image.xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
   MX_GIT_CACHE: refcache
+  JAVA_HOME: ${{ github.workspace }}/openjdk
+  MANDREL_REPO: ${{ github.workspace }}
+  MANDREL_HOME: ${{ github.workspace }}/../mandrelvm
+  MX_HOME: ${{ github.workspace }}/../mx
 
 jobs:
-  build-quarkus-and-graalvm:
-    name: Nightly quarkus and GraalVM build
+  build-mandrel:
+    name: Mandrel build - ${{ matrix.jdk }}
     runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        jdk: ['OpenJDK11-latest-GA', 'OpenJDK11-latest-EA']
+        include:
+          - jdk: 'OpenJDK11-latest-GA'
+            release_type: 'ga'
+          - jdk: 'OpenJDK11-latest-EA'
+            release_type: 'ea'
     steps:
     - uses: actions/checkout@v1
       with:
         fetch-depth: 1
-        path: graal
+        path: mandrel
     - uses: actions/checkout@v1
       with:
         repository: graalvm/mx.git
         ref: master
         path: mx
-    - name: Get latest quarkus release
-      run: |
-        curl --output quarkus.tgz -sL $(curl -sL https://api.github.com/repos/quarkusio/quarkus/releases/latest | jq -r .tarball_url)
-        mkdir ${GITHUB_WORKSPACE}/quarkus
-        tar xf quarkus.tgz -C ${GITHUB_WORKSPACE}/quarkus --strip-components=1
-    - uses: actions/cache@v1
+    - uses: actions/checkout@v1
       with:
-        path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
+        repository: graalvm/mandrel-packaging.git
+        ref: master
+        path: mandrel-packaging
     - uses: actions/cache@v1
       with:
         path: ~/.mx
         key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
         restore-keys: |
           ${{ runner.os }}-mx-
-    - name: Get labsJDK11 version
+    - name: Get OpenJDK 11 with static libs
       run: |
-        export LABSJDK_VERSION=$(jq -r '.jdks."labsjdk-ce-11".version' common.json)
-        echo "::set-env name=JDK_VERSION::$(echo $LABSJDK_VERSION | cut -d- -f 2 | cut -d+ -f 1)"
-        echo "::set-env name=JDK_VERSION_SUFFIX::+$(echo $LABSJDK_VERSION | cut -d- -f 2 | cut -d+ -f 2)"
-        echo "::set-env name=JVMCI_VERSION::$(echo $LABSJDK_VERSION | cut -d- -f 3,4,5)"
-    - name: Get labsJDK11
+        curl -sL https://api.adoptopenjdk.net/v3/binary/latest/11/${{ matrix.release_type }}/linux/x64/jdk/hotspot/normal/openjdk -o jdk.tar.gz
+        curl -sL https://api.adoptopenjdk.net/v3/binary/latest/11/${{ matrix.release_type }}/linux/x64/staticlibs/hotspot/normal/openjdk -o jdk-static-libs.tar.gz
+        mkdir -p ${JAVA_HOME}
+        tar xf jdk.tar.gz -C ${JAVA_HOME} --strip-components=1
+        tar xf jdk-static-libs.tar.gz -C ${JAVA_HOME} --strip-components=1
+        echo ${JAVA_HOME}
+        ${JAVA_HOME}/bin/java --version
+    - name: Build Mandrel
       run: |
-        export JDK_VERSION=${{ env.JDK_VERSION }}
-        export JDK_VERSION_SUFFIX=${{ env.JDK_VERSION_SUFFIX }}
-        export JVMCI_VERSION=${{ env.JVMCI_VERSION }}
-        wget --no-verbose "https://github.com/graalvm/labs-openjdk-11/releases/download/${JVMCI_VERSION}/labsjdk-ce-${JDK_VERSION}${JDK_VERSION_SUFFIX}-${JVMCI_VERSION}-linux-amd64.tar.gz"
-        tar xf labsjdk-ce-${JDK_VERSION}${JDK_VERSION_SUFFIX}-${JVMCI_VERSION}-linux-amd64.tar.gz
-        labsjdk-ce-${JDK_VERSION}-${JVMCI_VERSION}/bin/java --version
-    - name: Build graalvm native-image
-      run: |
-        export JAVA_HOME=${GITHUB_WORKSPACE}/labsjdk-ce-${{ env.JDK_VERSION }}-${{ env.JVMCI_VERSION }}
-        cd substratevm
-        ../../mx/mx --components="Native Image" build
-        mv $(../../mx/mx --components="Native Image" graalvm-home) ~/graaljdk
-        ~/graaljdk/bin/native-image --version
-    - name: Tar GraalVM
-      shell: bash
-      run: tar -czvf graaljdk.tgz -C ~ graaljdk
-    - name: Persist GraalVM build
-      uses: actions/upload-artifact@v1
+        cd ${{ github.workspace }}/../mandrel-packaging
+        ${JAVA_HOME}/bin/java -ea build.java --mx-home ${MX_HOME} --mandrel-repo ${MANDREL_REPO} --mandrel-home ${MANDREL_HOME} --archive-suffix tar.gz
+        ${MANDREL_HOME}/bin/native-image --version
+        mv mandrel-java11-linux-amd64-*.tar.gz ${{ github.workspace }}/mandreljdk-${{ matrix.jdk }}.tgz
+    - name: Persist Mandrel build
+      uses: actions/upload-artifact@v2
       with:
-        name: graaljdk
-        path: graaljdk.tgz
+        name: mandreljdk-${{ matrix.jdk }}
+        path: mandreljdk-${{ matrix.jdk }}.tgz
+
+  build-quarkus:
+    name: Quarkus ${{ matrix.quarkus-name }} build - ${{ matrix.jdk }}
+    runs-on: ubuntu-18.04
+    needs: build-mandrel
+    strategy:
+      matrix:
+        jdk: ['OpenJDK11-latest-GA', 'OpenJDK11-latest-EA']
+        quarkus-name: [release, master]
+        include:
+          - quarkus-name: release
+            quarkus-version: $(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
+          - quarkus-name: master
+            quarkus-version: master
+    steps:
+    - name: Get quarkus
+      run: |
+        curl --output quarkus.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/${{ matrix.quarkus-version }}
+        mkdir ${GITHUB_WORKSPACE}/quarkus
+        tar xf quarkus.tgz -C ${GITHUB_WORKSPACE}/quarkus --strip-components=1
+    - uses: actions/cache@v1
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-${{ matrix.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.quarkus-version }}-maven-
+    - name: Download Mandrel build
+      uses: actions/download-artifact@v1
+      with:
+        name: mandreljdk-${{ matrix.jdk }}
+        path: .
+    - name: Extract Mandrel build
+      shell: bash
+      run: tar -xzvf mandreljdk-${{ matrix.jdk }}.tgz -C ~
     - name: Build quarkus
       run: |
-        export JAVA_HOME=${GITHUB_WORKSPACE}/labsjdk-ce-${{ env.JDK_VERSION }}-${{ env.JVMCI_VERSION }}
+        export JAVA_HOME="${HOME}/mandrelvm"
         cd ${GITHUB_WORKSPACE}/quarkus
-        eval ./mvnw -e -B -DskipTests -DskipDocs clean install
+        mvn -e -B --settings .github/mvn-settings.xml -DskipTests -DskipITs -Dno-format -DskipDocs clean install
     - name: Tar Maven Repo
       shell: bash
-      run: tar -czvf maven-repo.tgz -C ~ .m2/repository
+      run: tar -czvf maven-repo-${{ matrix.quarkus-name }}-${{ matrix.jdk }}.tgz -C ~ .m2/repository
     - name: Persist Maven Repo
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v2
       with:
-        name: maven-repo
-        path: maven-repo.tgz
+        name: maven-repo-${{ matrix.quarkus-name }}-${{ matrix.jdk }}
+        path: maven-repo-${{ matrix.quarkus-name }}-${{ matrix.jdk }}.tgz
+    - name: Delete Local Artifacts From Cache
+      shell: bash
+      run: rm -r ~/.m2/repository/io/quarkus
 
   native-tests:
-    name: Native Tests - ${{matrix.category}}
-    needs: build-quarkus-and-graalvm
-    runs-on: ubuntu-latest
+    name: ${{matrix.quarkus-name}} - ${{matrix.category}} - ${{ matrix.jdk }}
+    needs:
+      - build-mandrel
+      - build-quarkus
+    runs-on: ubuntu-18.04
     # Ignore the following YAML Schema error
     timeout-minutes: ${{matrix.timeout}}
     strategy:
-      max-parallel: 8
       fail-fast: false
       matrix:
+        jdk: ['OpenJDK11-latest-GA', 'OpenJDK11-latest-EA']
+        quarkus-name: [release, master]
         category: [Main, Data1, Data2, Data3, Data4, Data5, Data6, Security1, Security2, Security3, Amazon, Messaging, Cache, HTTP, Misc1, Misc2, Misc3, Misc4, Spring, gRPC]
         include:
+          - quarkus-name: release
+            quarkus-version: $(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
+          - quarkus-name: master
+            quarkus-version: master
           - category: Main
             postgres: "true"
             timeout: 40
@@ -112,7 +166,7 @@ jobs:
           - category: Data1
             mariadb: "true"
             mssql: "true"
-            timeout: 65
+            timeout: 85
             test-modules: >
               jpa-h2
               jpa-mariadb
@@ -124,7 +178,7 @@ jobs:
             db2: "true"
             mysql: "true"
             mariadb: "true"
-            timeout: 65
+            timeout: 85
             test-modules: >
               jpa
               jpa-mysql
@@ -145,7 +199,7 @@ jobs:
           - category: Data4
             neo4j: "true"
             redis: "true"
-            timeout: 55
+            timeout: 70
             test-modules: >
               mongodb-client
               mongodb-panache
@@ -154,7 +208,7 @@ jobs:
               hibernate-orm-rest-data-panache
           - category: Data5
             postgres: "true"
-            timeout: 65
+            timeout: 75
             test-modules: >
               jpa-postgresql
               narayana-stm
@@ -163,11 +217,12 @@ jobs:
               hibernate-reactive-postgresql
           - category: Data6
             postgres: "true"
+            elasticsearch: "true"
             timeout: 40
             test-modules: >
               elasticsearch-rest-client
               elasticsearch-rest-high-level-client
-              hibernate-search-elasticsearch
+              hibernate-search-orm-elasticsearch
           - category: Amazon
             amazonServices: "true"
             timeout: 45
@@ -176,15 +231,16 @@ jobs:
               amazon-lambda
               amazon-lambda-http
           - category: Messaging
-            timeout: 75
+            timeout: 85
             test-modules: >
               artemis-core
               artemis-jms
               kafka
               kafka-streams
               reactive-messaging-amqp
+              reactive-messaging-kafka
           - category: Security1
-            timeout: 50
+            timeout: 75
             keycloak: "true"
             test-modules: >
               elytron-security-oauth2
@@ -196,11 +252,11 @@ jobs:
             timeout: 70
             keycloak: "true"
             test-modules: >
-              elytron-resteasy
               oidc
               oidc-code-flow
               oidc-tenancy
               keycloak-authorization
+              oidc-wiremock
           - category: Security3
             timeout: 50
             test-modules: >
@@ -214,8 +270,9 @@ jobs:
               infinispan-client
               cache
           - category: HTTP
-            timeout: 60
+            timeout: 75
             test-modules: >
+              elytron-resteasy
               resteasy-jackson
               resteasy-mutiny
               vertx
@@ -225,7 +282,7 @@ jobs:
               virtual-http
               rest-client
           - category: Misc1
-            timeout: 60
+            timeout: 65
             test-modules: >
               maven
               jackson
@@ -236,26 +293,34 @@ jobs:
               qute
               consul-config
           - category: Misc2
-            timeout: 55
+            timeout: 65
             test-modules: >
               tika
               hibernate-validator
               test-extension
               logging-gelf
               bootstrap-config
+              mailer
           # kubernetes-client alone takes 30mn+
           - category: Misc3
-            timeout: 60
+            timeout: 65
             test-modules: >
               kubernetes-client
+              openshift-client
           - category: Misc4
-            timeout: 30
+            timeout: 95
             test-modules: >
+              smallrye-config
               smallrye-graphql
               picocli-native
               gradle
+              micrometer-mp-metrics
+              micrometer-prometheus
+              smallrye-metrics
+              logging-json
+              jaxp
           - category: Spring
-            timeout: 50
+            timeout: 75
             test-modules: >
               spring-di
               spring-web
@@ -263,12 +328,13 @@ jobs:
               spring-boot-properties
               spring-cloud-config-client
           - category: gRPC
-            timeout: 65
+            timeout: 75
             test-modules: >
               grpc-health
               grpc-interceptors
               grpc-mutual-auth
               grpc-plain-text
+              grpc-plain-text-mutiny
               grpc-proto-v2
               grpc-streaming
               grpc-tls
@@ -326,39 +392,51 @@ jobs:
               -server -Xms64m -Xmx512m -XX:MetaspaceSize=96M \
               -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true -Djava.awt.headless=true \
               -Dkeycloak.profile.feature.upload_scripts=enabled" \
-            -d quay.io/keycloak/keycloak:11.0.0
+            -d quay.io/keycloak/keycloak:11.0.1
         if: matrix.keycloak
-      - name: Download GraalVM build
-        uses: actions/download-artifact@v1
-        with:
-          name: graaljdk
-          path: .
-      - name: Extract GraalVM build
-        shell: bash
-        run: tar -xzvf graaljdk.tgz -C ${GITHUB_WORKSPACE}
-      - name: Get latest quarkus release
+      - name: Elasticsearch Service
         run: |
-          curl --output quarkus.tgz -sL $(curl -sL https://api.github.com/repos/quarkusio/quarkus/releases/latest | jq -r .tarball_url)
-          mkdir ${GITHUB_WORKSPACE}/quarkus
-          tar xf quarkus.tgz -C ${GITHUB_WORKSPACE}/quarkus --strip-components=1
-      - name: Reclaim Disk Space
-        run: ${GITHUB_WORKSPACE}/quarkus/.github/ci-prerequisites.sh
+          docker run --rm --publish 9200:9200 --name build-elasticsearch \
+          -e discovery.type=single-node \
+          -d docker.elastic.co/elasticsearch/elasticsearch-oss:7.9.0
+        if: matrix.elasticsearch
       - name: Download Maven Repo
         uses: actions/download-artifact@v1
         with:
-          name: maven-repo
+          name: maven-repo-${{ matrix.quarkus-name }}-${{ matrix.jdk }}
           path: .
       - name: Extract Maven Repo
         shell: bash
-        run: tar -xzf maven-repo.tgz -C ~
+        run: tar -xzvf maven-repo-${{ matrix.quarkus-name }}-${{ matrix.jdk }}.tgz -C ~
+      - name: Download Mandrel build
+        uses: actions/download-artifact@v1
+        with:
+          name: mandreljdk-${{ matrix.jdk }}
+          path: .
+      - name: Extract Mandrel build
+        shell: bash
+        run: tar -xzvf mandreljdk-${{ matrix.jdk }}.tgz -C ~
+      - name: Get quarkus
+        run: |
+          curl --output quarkus.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/${{ matrix.quarkus-version }}
+          mkdir ${GITHUB_WORKSPACE}/quarkus
+          tar xf quarkus.tgz -C ${GITHUB_WORKSPACE}/quarkus --strip-components=1
+      - name: Reclaim disk space
+        run: |
+          # Reclaim disk space, otherwise we only have 13 GB free at the start of a job
+          docker rmi node:10 node:12 mcr.microsoft.com/azure-pipelines/node8-typescript:latest
+          # That is 18 GB
+          sudo rm -rf /usr/share/dotnet
+          # That is 1.2 GB
+          sudo rm -rf /usr/share/swift
       - name: Build with Maven
         env:
           TEST_MODULES: ${{matrix.test-modules}}
           CATEGORY: ${{matrix.category}}
         run: |
           cd ${GITHUB_WORKSPACE}/quarkus
-          export JAVA_HOME=${GITHUB_WORKSPACE}/graaljdk
-          export GRAALVM_HOME=${GITHUB_WORKSPACE}/graaljdk
+          export JAVA_HOME="${HOME}/mandrelvm"
+          export GRAALVM_HOME="${HOME}/mandrelvm"
           ${GRAALVM_HOME}/bin/native-image --version
           for i in $TEST_MODULES
           do modules+=("integration-tests/$i"); done
@@ -368,14 +446,14 @@ jobs:
           # done because there is no good way to pass strings with empty values to the previous command
           # so this hack is as good as any
           if [ "$CATEGORY" == "Misc1" ]; then
-            mvn -Dnative -B --settings ${GITHUB_WORKSPACE}/quarkus/.github/mvn-settings.xml -f 'integration-tests/simple with space/' verify
+            mvn -Dnative -B --settings .github/mvn-settings.xml -f 'integration-tests/simple with space/' verify
           fi
       - name: Prepare failure archive (if maven failed)
         if: failure()
         shell: bash
         run: find . -type d -name '*-reports' -o -wholename '*/build/reports/tests/functionalTest' | tar -czf test-reports.tgz -T -
       - name: Upload failure Archive (if maven failed)
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         if: failure()
         with:
           name: test-reports-native-${{matrix.category}}
