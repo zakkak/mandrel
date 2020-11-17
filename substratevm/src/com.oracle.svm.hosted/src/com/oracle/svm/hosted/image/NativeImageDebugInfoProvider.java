@@ -37,7 +37,6 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import com.oracle.graal.pointsto.infrastructure.OriginalClassProvider;
-import com.oracle.graal.pointsto.infrastructure.OriginalMethodProvider;
 import com.oracle.graal.pointsto.meta.AnalysisMethod;
 import com.oracle.graal.pointsto.meta.AnalysisType;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider;
@@ -50,8 +49,6 @@ import com.oracle.svm.core.graal.code.SubstrateBackend;
 import com.oracle.svm.core.image.ImageHeapPartition;
 import com.oracle.svm.hosted.annotation.CustomSubstitutionMethod;
 import com.oracle.svm.hosted.annotation.CustomSubstitutionType;
-import com.oracle.svm.hosted.code.CCallStubMethod;
-import com.oracle.svm.hosted.code.CEntryPointCallStubMethod;
 import com.oracle.svm.hosted.image.NativeImageHeap.ObjectInfo;
 import com.oracle.svm.hosted.image.sources.SourceManager;
 import com.oracle.svm.hosted.lambda.LambdaSubstitutionType;
@@ -848,7 +845,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         @Override
         public String methodName() {
             ResolvedJavaMethod targetMethod = hostedMethod.getWrapped().getWrapped();
-            if (targetMethod instanceof SubstitutionMethod){
+            if (targetMethod instanceof SubstitutionMethod) {
                 targetMethod = ((SubstitutionMethod) targetMethod).getOriginal();
             } else if (targetMethod instanceof CustomSubstitutionMethod) {
                 targetMethod = ((CustomSubstitutionMethod) targetMethod).getOriginal();
@@ -1004,7 +1001,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             if (targetMethod instanceof AnalysisMethod) {
                 targetMethod = ((AnalysisMethod) targetMethod).getWrapped();
             }
-            if (targetMethod instanceof SubstitutionMethod){
+            if (targetMethod instanceof SubstitutionMethod) {
                 targetMethod = ((SubstitutionMethod) targetMethod).getOriginal();
             } else if (targetMethod instanceof CustomSubstitutionMethod) {
                 targetMethod = ((CustomSubstitutionMethod) targetMethod).getOriginal();
