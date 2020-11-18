@@ -45,7 +45,7 @@ dnf install glibc-devel zlib-devel gcc
 
 On Ubuntu-like systems with:
 ```bash
-apt install gcc zlib1g-dev
+apt install libc6-dev zlib1g-dev gcc
 ```
 
 ## Building Mandrel From Source
