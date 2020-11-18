@@ -69,7 +69,7 @@ jobs:
         key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
         restore-keys: |
           ${{ runner.os }}-mx-
-    - name: Get openJDK with static libs
+    - name: Get OpenJDK 11 with static libs
       run: |
         curl -sL https://api.adoptopenjdk.net/v3/binary/latest/11/${{ matrix.release_type }}/linux/x64/jdk/hotspot/normal/openjdk -o jdk.tar.gz
         curl -sL https://api.adoptopenjdk.net/v3/binary/latest/11/${{ matrix.release_type }}/linux/x64/staticlibs/hotspot/normal/openjdk -o jdk-static-libs.tar.gz
