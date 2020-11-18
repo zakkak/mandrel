@@ -37,7 +37,7 @@ import java.nio.file.Paths;
 
 public class Range {
 
-    private static final String CLASS_DELIMITER = ".";
+    private static final String CLASS_DELIMITER = "::";
 
     private final String cachePath;
     private String fileName;
