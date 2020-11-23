@@ -89,16 +89,27 @@ jobs:
     name: Get Quarkus versions
     runs-on: ubuntu-18.04
     outputs:
-      matrix: ${{ steps.versions.outputs.matrix }}
+      build-matrix: ${{ steps.versions.outputs.build-matrix }}
+      tests-matrix: ${{ steps.versions.outputs.tests-matrix }}
     steps:
     - name: Get Quarkus versions
       id: versions
       run: |
         quarkus_latest=$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
         echo ${quarkus_latest}
-        json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]}' | tr -d '\n')
-        echo $json
-        echo "::set-output name=matrix::${json}"
+        build_json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]}' | tr -d '\n')
+        echo ${build_json}
+        echo "::set-output name=build-matrix::${build_json}"
+        curl --output quarkus-release.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/${quarkus_latest}
+        tar xf quarkus-release.tgz --wildcards --strip-components=2 '*/native-tests.json'
+        jq --arg version ${quarkus_latest} '.include[] += {"quarkus-version": $version}' native-tests.json > release-tests.json
+        curl --output quarkus-master.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/master
+        tar xf quarkus-master.tgz --wildcards --strip-components=2 '*/native-tests.json'
+        jq '.include[] += {"quarkus-version": "master"}' native-tests.json > master-tests.json
+        jq -s '.[0].include += .[1].include | .[0]' release-tests.json master-tests.json > native-tests.json
+        tests_json=$(jq --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]} + .' native-tests.json | tr -d '\n')
+        echo ${tests_json}
+        echo "::set-output name=tests-matrix::${tests_json}"
 
   build-quarkus:
     name: Quarkus ${{ matrix.quarkus-version }} - ${{ matrix.jdk }} OpenJDK11
@@ -108,9 +119,7 @@ jobs:
       - build-mandrel
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.get-quarkus-versions.outputs.matrix) }}
-    outputs:
-      matrix: ${{ steps.read.outputs.matrix }}
+      matrix: ${{ fromJson(needs.get-quarkus-versions.outputs.build-matrix) }}
     steps:
     - name: Get quarkus
       run: |
@@ -135,12 +144,6 @@ jobs:
         export JAVA_HOME="${HOME}/mandrelvm"
         cd ${QUARKUS_PATH}
         mvn -e -B -Dquickly
-    - name: Read json file with native-tests matrix
-      id: read
-      run: |
-        json=$(jq --arg version ${{ matrix.quarkus-version }} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]} + .' ${QUARKUS_PATH}/.github/native-tests.json | tr -d '\n')
-        echo $json
-        echo "::set-output name=matrix::${json}"
     - name: Tar Maven Repo
       shell: bash
       run: tar -czvf maven-repo-${{ matrix.quarkus-version }}-${{ matrix.jdk }}.tgz -C ~ .m2/repository
@@ -158,12 +161,13 @@ jobs:
     needs:
       - build-mandrel
       - build-quarkus
+      - get-quarkus-versions
     runs-on: ubuntu-18.04
     # Ignore the following YAML Schema error
     timeout-minutes: ${{matrix.timeout}}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.build-quarkus.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.get-quarkus-versions.outputs.tests-matrix) }}
     steps:
       - name: Download Maven Repo
         uses: actions/download-artifact@v1
