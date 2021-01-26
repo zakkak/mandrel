@@ -33,18 +33,22 @@ Mandrel distributions can be downloaded from [the repository's releases](https:/
 ### Prerequisites
 
 Mandrel's `native-image` depends on the following packages:
-* glibc-devel
-* zlib-devel
+* freetype-devel
 * gcc
+* glibc-devel
+* libstdc++-static
+* zlib-devel
 
 On Fedora/CentOS/RHEL they can be installed with:
 ```bash
-dnf install glibc-devel zlib-devel gcc
+dnf install glibc-devel zlib-devel gcc freetype-devel libstdc++-static
 ```
+
+**Note**: the package might be called `glibc-static` instead of `libstdc++-static`.
 
 On Ubuntu-like systems with:
 ```bash
-apt install libc6-dev zlib1g-dev gcc
+apt install g++ zlib1g-dev libfreetype6-dev
 ```
 
 ### Building Mandrel From Source
