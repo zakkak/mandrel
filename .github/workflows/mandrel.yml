@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: ['ga']
+        jdk: ['ga', 'ea']
     steps:
     - uses: actions/checkout@v1
       with:
@@ -96,7 +96,7 @@ jobs:
       run: |
         quarkus_latest=$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
         echo ${quarkus_latest}
-        json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga"], "quarkus-version": [$version, "master"]}' | tr -d '\n')
+        json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]}' | tr -d '\n')
         echo $json
         echo "::set-output name=matrix::${json}"
 
@@ -138,7 +138,7 @@ jobs:
     - name: Read json file with native-tests matrix
       id: read
       run: |
-        json=$(jq --arg version ${{ matrix.quarkus-version }} '{"jdk": ["ga"], "quarkus-version": [$version, "master"]} + .' ${QUARKUS_PATH}/.github/native-tests.json | tr -d '\n')
+        json=$(jq --arg version ${{ matrix.quarkus-version }} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]} + .' ${QUARKUS_PATH}/.github/native-tests.json | tr -d '\n')
         echo $json
         echo "::set-output name=matrix::${json}"
     - name: Tar Maven Repo
