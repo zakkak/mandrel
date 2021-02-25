@@ -86,6 +86,7 @@ public final class Version implements Comparable<Version> {
     }
 
     Version(String v) {
+        String suffix = null;
         if (v.equals(SNAPSHOT_STRING)) {
             snapshot = true;
             versions = new int[0];
@@ -98,7 +99,6 @@ public final class Version implements Comparable<Version> {
                 snapshot = suffix.equals(SNAPSHOT_SUFFIX);
                 end = dash;
             } else {
-                suffix = null;
                 snapshot = false;
                 end = v.length();
             }
@@ -107,10 +107,21 @@ public final class Version implements Comparable<Version> {
             String[] versionChunks = versionsString.split("\\.", -1);
             int[] intVersions = new int[versionChunks.length];
             for (int i = 0; i < versionChunks.length; i++) {
+                final String versionChunk = versionChunks[i];
                 try {
-                    intVersions[i] = Integer.parseInt(versionChunks[i]);
+                    intVersions[i] = Integer.parseInt(versionChunk);
                 } catch (NumberFormatException f) {
-                    throw invalid(v);
+                    // Mandrel versions come with a string suffix after the last dot or after an underscore
+                    // e.g. 20.3.1.2.Final (for community builds) or 20.3.1.2_0-1 (for RedHat builds)
+                    if (i != 0 && i == versionChunks.length - 1 && !versionChunk.isEmpty()) {
+                        if (versionChunk.contains("_")) {
+                            final String[] split = versionChunk.split("_");
+                            intVersions[i] = Integer.parseInt(split[0]);
+                        }
+                        suffix = null;
+                    } else {
+                        throw invalid(v);
+                    }
                 }
                 // versions cannot be negative as we would already
                 // cut at the first occurrence of '-'
@@ -123,6 +134,7 @@ public final class Version implements Comparable<Version> {
             }
             this.versions = intVersions;
         }
+        this.suffix = suffix;
     }
 
     private static int[] trimTrailingZeros(int[] intVersions) {

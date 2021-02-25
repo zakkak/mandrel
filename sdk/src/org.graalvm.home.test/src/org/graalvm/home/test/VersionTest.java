@@ -99,6 +99,24 @@ public class VersionTest {
     }
 
     @Test
+    public void testMandrelVersions() {
+        // Community versions
+        assertParseEquals("20.3.1.2", "20.3.1.2.Final");
+        assertParseEquals("20.3.0", "20.3.0.0.Final");
+        assertEquals(-1, Version.parse("20.3.1.1.Final").compareTo(Version.parse("20.3.1.2.Final")));
+        assertEquals(1, Version.parse("20.3.2.1.Final").compareTo(Version.parse("20.3.1.2.Final")));
+        assertEquals(-1, Version.parse("20.3").compareTo(Version.parse("20.3.1.2.Final")));
+        assertEquals(0, Version.parse("20.3.1").compareTo(Version.parse("20.3.1.0.Final")));
+        assertEquals(1, Version.parse("21.0.0.0.Final").compareTo(Version.parse("20.3.1.2.Final")));
+
+        // RedHat build versions
+        assertParseEquals("20.3.1.2", "20.3.1.2_0-1");
+        assertEquals(0, Version.parse("20.3.1.2_0-1").compareTo(Version.parse("20.3.1.2_1-1")));
+        assertEquals(0, Version.parse("20.3.1.2_0-1").compareTo(Version.parse("20.3.1.2_0-4")));
+        assertEquals(1, Version.parse("20.3.1.2_0-1").compareTo(Version.parse("20.3.1.0_0-4")));
+    }
+
+    @Test
     public void testSnapshot() {
         assertEquals(-1, Version.parse("snapshot").compareTo(0, 0, 0, 0, 1));
         assertEquals(1, Version.create(0, 0, 0, 0, 1).compareTo(Version.parse("snapshot")));
