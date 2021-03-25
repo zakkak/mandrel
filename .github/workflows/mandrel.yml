@@ -86,17 +86,17 @@ jobs:
       run: |
         quarkus_latest=$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
         echo ${quarkus_latest}
-        build_json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]}' | tr -d '\n')
+        build_json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "main"]}' | tr -d '\n')
         echo ${build_json}
         echo "::set-output name=build-matrix::${build_json}"
         curl --output quarkus-release.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/${quarkus_latest}
         tar xf quarkus-release.tgz --wildcards --strip-components=2 '*/native-tests.json'
         jq --arg version ${quarkus_latest} '.include[] += {"quarkus-version": $version}' native-tests.json > release-tests.json
-        curl --output quarkus-master.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/master
-        tar xf quarkus-master.tgz --wildcards --strip-components=2 '*/native-tests.json'
-        jq '.include[] += {"quarkus-version": "master"}' native-tests.json > master-tests.json
-        jq -s '.[0].include += .[1].include | .[0]' release-tests.json master-tests.json > native-tests.json
-        tests_json=$(jq --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "master"]} + .' native-tests.json | tr -d '\n')
+        curl --output quarkus-main.tgz -sL https://api.github.com/repos/quarkusio/quarkus/tarball/main
+        tar xf quarkus-main.tgz --wildcards --strip-components=2 '*/native-tests.json'
+        jq '.include[] += {"quarkus-version": "main"}' native-tests.json > main-tests.json
+        jq -s '.[0].include += .[1].include | .[0]' release-tests.json main-tests.json > native-tests.json
+        tests_json=$(jq --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "main"]} + .' native-tests.json | tr -d '\n')
         echo ${tests_json}
         echo "::set-output name=tests-matrix::${tests_json}"
 
