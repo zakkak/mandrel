@@ -27,7 +27,7 @@ env:
 jobs:
   build-mandrel:
     name: Mandrel build - OpenJDK11-${{ matrix.jdk }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +76,7 @@ jobs:
 
   get-quarkus-versions:
     name: Get Quarkus versions
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     outputs:
       build-matrix: ${{ steps.versions.outputs.build-matrix }}
       tests-matrix: ${{ steps.versions.outputs.tests-matrix }}
@@ -102,7 +102,7 @@ jobs:
 
   build-quarkus:
     name: Quarkus ${{ matrix.quarkus-version }} - ${{ matrix.jdk }} OpenJDK11
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs:
       - get-quarkus-versions
       - build-mandrel
@@ -151,7 +151,7 @@ jobs:
       - build-mandrel
       - build-quarkus
       - get-quarkus-versions
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     # Ignore the following YAML Schema error
     timeout-minutes: ${{matrix.timeout}}
     strategy:
