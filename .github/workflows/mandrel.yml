@@ -181,6 +181,7 @@ jobs:
           tar xf quarkus.tgz -C ${QUARKUS_PATH} --strip-components=1
       - name: Reclaim disk space
         run: |
+          docker images
           # Reclaim disk space, otherwise we only have 13 GB free at the start of a job
           docker rmi node:10 node:12 mcr.microsoft.com/azure-pipelines/node8-typescript:latest
           # That is 18 GB
