@@ -1,0 +1,88 @@
+name: Quarkus tests
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.travis.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.travis.yml'
+
+env:
+  WORKFLOW_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
+  WORKFLOW: base.yml
+
+jobs:
+  dispatch:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - name: "Q main Mandrel build of 21.1-${{ github.sha }}"
+            inputs: '{"quarkus-version": "main", "version": "${{ github.sha }}", "mandrel-packaging-version": "21.1"}'
+          #- name: "Q latest Mandrel build of 21.1-${{ github.sha }}"
+          #  inputs: '{"quarkus-version": "latest", "version": "${{ github.sha }}"}'
+    steps:
+    - name: Start workflow
+      timeout-minutes: 10
+      run: |
+        WF_RESULT="500"
+        INPUTS=$(jq -c '. += {name: "${{ matrix.name }}"}' <<<$(echo '${{ matrix.inputs }}'))
+        echo ${INPUTS}
+        while [[ ${WF_RESULT} == "500" ]]
+        do
+          WF_RESULT=$(curl -s -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${WORKFLOW_TOKEN}" \
+            -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${INPUTS}}" \
+            -w "%{http_code}")
+          sleep 30 # back off
+        done
+        if [[ ${WF_RESULT} == "204" ]]
+        then
+          WF_ID=$(curl -s -X GET "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/runs" \
+            -H 'Accept: application/vnd.github.antiope-preview+json' \
+            -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '[.workflow_runs[]] | first | .id')
+          echo "Started ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${WF_ID}"
+          echo "WF_ID=${WF_ID}" >> ${GITHUB_ENV}
+        else
+          echo -e "Failed with:\n ${WF_RESULT}\n"
+          exit 1
+        fi
+    - name: Wait workflow
+      if: ${{ github.event_name == 'pull_request' }}
+      run: |
+        WF_CONCLUSION="null"
+        WF_STATUS="inprogress"
+
+        while [[ ${WF_CONCLUSION} == "null" && ${WF_STATUS} != "\"completed\"" ]]
+        do
+          sleep 60
+          WF_RESULT=$(curl -s -X GET "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/runs" \
+            -H 'Accept: application/vnd.github.antiope-preview+json' \
+            -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '.workflow_runs[] | select(.id == '${{ env.WF_ID }}')'
+          WF_CONCLUSION=$(echo ${WF_RESULT} | jq '.conclusion')
+          WF_STATUS=$(echo ${WF_RESULT} | jq '.status')
+          echo "Waiting for ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${{ env.WF_ID }}"
+          echo "Conclusion: ${WF_CONCLUSION}"
+          echo "Status: ${WF_STATUS}"
+        done
+
+        if [[ ${WF_CONCLUSION == "\"success\"" && ${WF_STATUS} == "\"completed\"" ]]
+        then
+          echo "Succeeded"
+        else
+          echo "Failed with: ${WF_CONCLUSION}"
+          exit 1
+        fi
