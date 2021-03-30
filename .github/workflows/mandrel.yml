@@ -95,7 +95,7 @@ jobs:
     - name: Get Quarkus versions
       id: versions
       run: |
-        quarkus_latest=$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
+        quarkus_latest=1.11 #$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
         echo ${quarkus_latest}
         build_json=$(jq -n --arg version ${quarkus_latest} '{"jdk": ["ga", "ea"], "quarkus-version": [$version, "main"]}' | tr -d '\n')
         echo ${build_json}
