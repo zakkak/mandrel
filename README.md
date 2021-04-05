@@ -1,15 +1,22 @@
 # Mandrel
 
-Mandrel is a downstream distribution of the GraalVM community edition.
+Mandrel is [a downstream distribution of the GraalVM community edition](https://developers.redhat.com/blog/2020/06/05/mandrel-a-community-distribution-of-graalvm-for-the-red-hat-build-of-quarkus/).
 Mandrel's main goal is to provide a `native-image` release specifically to support [Quarkus](https://quarkus.io).
 The aim is to align the `native-image` capabilities from GraalVM with OpenJDK and Red Hat Enterprise Linux libraries to improve maintainability for native Quarkus applications.
+Mandrel can best be described as a distribution of a regular OpenJDK with a specially packaged GraalVM Native Image builder (`native-image`).
 
 ## How Does Mandrel Differ From Graal
 
 Mandrel releases are built from a code base derived from the upstream GraalVM code base, with only minor changes but some significant exclusions. 
-They support the same native image capability as GraalVM with no significant changes to functionality.
-They do not include support for the image build server and Polyglot programming via the Truffle interpreter and compiler framework. 
-In consequence, it is not possible to extend Mandrel by downloading languages from the Truffle language catalogue.
+A full distribution of GraalVM is much more than `native-image`: it has polyglot support, the Truffle framework which allows for efficient implementation of interpreters, an LLVM compiler back end for native image, the libgraal JIT compiler as a replacement for Hotspot’s C2 server compiler and much more.
+Mandrel is the small subset of that functionality we support for the `native-image` use-case.
+
+Mandrel's `native-image` also doesn't include the following features:
+* The experimental image-build server, i.e., the `--experimental-build-server` option.
+* The LLVM backend, i.e., the `-H:CompilerBackend=llvm` option.
+* The musl libc implementation, i.e., the `--libc=musl` option.
+* Support for generating static native images, i.e., the `--static` option.
+* Support for non JVM-based languages and polyglot, i.e., the `--language:<languageId>` option.
 
 Mandrel is also built slightly differently to GraalVM, using the standard OpenJDK project release of jdk11u.
 This means it does not profit from a few small enhancements that Oracle have added to the version of OpenJDK used to build their own GraalVM downloads.
@@ -20,7 +27,7 @@ They should not cause the resulting images themselves to execute in a noticeably
 
 ## Communication Channels
 
-* [Slack](https://www.graalvm.org/slack-invitation) - Join #mandrel channel at graalvm's slack workspace
+* [Slack](https://www.graalvm.org/slack-invitation) - Join `#mandrel` channel at graalvm's slack workspace
 * [graalvm-dev@oss.oracle.com](mailto:graalvm-dev@oss.oracle.com?subject=[MANDREL]) mailing list - Subscribe [here](https://oss.oracle.com/mailman/listinfo/graalvm-dev)
 * [GitHub issues](https://github.com/graalvm/mandrel/issues) for bug reports, questions, or requests for enhancements.
 
