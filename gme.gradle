@@ -1,0 +1,44 @@
+/**
+ * This file is injected at the start by the Gradle Manipulation Tool during the analysis phase
+ */
+
+buildscript {
+    // While the global PNC init script also defines this, for some reason
+    // Gradle doesn't seem to apply it to included scrpts.
+
+    apply from: "gradle/gme-repos.gradle", to: buildscript
+
+    // Running inside PNC
+    apply from: "${project.rootDir}/gradle/gme-repos.gradle", to: buildscript
+
+    if (System.getenv("AProxDependencyUrl") == null) {
+        // Not running in PNC e.g. local development environment.
+        repositories {
+            // Maven local isn't required for production but its useful during development.
+            mavenLocal()
+            mavenCentral()
+            maven {
+                url "https://oss.sonatype.org/content/repositories/snapshots"
+            }
+        }
+    }
+
+    // this flag is used to disable the execution of the manipulation plugin
+    // after the analyzer plugin has already run on the projects
+    // This avoids issues with rerunning in local environments and also in
+    // tests when we don't want to apply the manipulation plugin, but
+    // just rerun the analyzer plugin
+    if (!project.hasProperty("gmeAnalyse")) {
+        dependencies {
+            classpath "org.jboss.gm:manipulation:2.6"
+        }
+    }
+}
+
+allprojects {
+    if (!project.hasProperty("gmeAnalyse")) {
+        logger.info("Applying plugin org.jboss.gm.manipulation.ManipulationPlugin to project in {}", project.getProjectDir())
+        apply plugin: org.jboss.gm.manipulation.ManipulationPlugin
+    }
+
+}
