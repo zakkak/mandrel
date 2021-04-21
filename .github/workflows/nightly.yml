@@ -24,39 +24,38 @@ jobs:
       matrix:
         include:
           - name: "Q main Mandrel build of latest graal"
-            inputs: "{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"jdk\": \"ea\"}"
+            inputs: '{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"jdk\": \"ea\"}'
           - name: "Q main GraalVM CE build of latest graal"
-            inputs: "{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"distribution\": \"graalvm\"}"
+            inputs: '{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"distribution\": \"graalvm\"}'
           - name: "Q main Mandrel 20.3 image from quay.io"
-            inputs: "{\"quarkus-version\": \"main\", \"builder-iamge\": \"quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11\"}"
+            inputs: '{\"quarkus-version\": \"main\", \"builder-image\": \"quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11\"}'
           - name: "Q main Mandrel 21.0 image from quay.io"
-            inputs: "{\"quarkus-version\": \"main\", \"builder-iamge\": \"quay.io/quarkus/ubi-quarkus-mandrel:21.0-java11\"}"
+            inputs: '{\"quarkus-version\": \"main\", \"builder-image\": \"quay.io/quarkus/ubi-quarkus-mandrel:21.0-java11\"}'
           #- name: "Q main Mandrel 20.3 build from source"
-          #  inputs: "{\"quarkus-version\": \"main\", \"version\": \"mandrel-20.3.1.2-Final\", \"build-from-source\": \"false\"}"
+          #  inputs: '{\"quarkus-version\": \"main\", \"version\": \"mandrel-20.3.1.2-Final\", \"build-from-source\": \"false\"}'
           #- name: "Q main Mandrel 21.0 build from source"
-          #  inputs: "{\"quarkus-version\": \"main\", \"version\": \"mandrel-21.0.0.0-Final\", \"build-from-source\": \"false\"}"
+          #  inputs: '{\"quarkus-version\": \"main\", \"version\": \"mandrel-21.0.0.0-Final\", \"build-from-source\": \"false\"}'
     steps:
     - name: Start workflow
       run: |
-        WF_RESULT=$(curl -X POST "${GITHUB_API_URL}/repos/${{ env.GITHUB_REPOSITORY }}/actions/workflows/${WORKFLOW}/dispatches" \
+        WF_RESULT=$(curl -s -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches" \
           -H "Accept: application/vnd.github.v3+json" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${WORKFLOW_TOKEN}" \
-          -d "{\"ref\":\"${{ env.GITHUB_REF }}\",\"inputs\":${{ matrix.inputs }}}" \
+          -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${{ matrix.inputs }}}" \
           -w "%{http_code}")
         if [[ ${WF_RESULT} == "204" ]]
         then
-          echo "Succeeded"
+          sleep 30 # wait for the workflow to be scheduled
+          WF_ID=$(curl -s -X GET "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/runs" \
+            -H 'Accept: application/vnd.github.antiope-preview+json' \
+            -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '[.workflow_runs[]] | first | .id')
+          echo "Started ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${WF_ID}"
+          echo "WF_ID=${WF_ID}" >> ${GITHUB_ENV}
         else
           echo -e "Failed with:\n ${WF_RESULT}\n"
           exit 1
         fi
-        sleep 30 # wait for the workflow to be scheduled
-        WF_ID=$(curl -X GET "${GITHUB_API_URL}/repos/${{ env.GITHUB_REPOSITORY }}/actions/workflows/${WORKFLOW}/runs" \
-          -H 'Accept: application/vnd.github.antiope-preview+json' \
-          -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '[.workflow_runs[]] | first | .id')
-        echo "Started ${GITHUB_SERVER_URL}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${WF_ID}"
-        echo "WF_ID=${WF_ID}" >> ${GITHUB_ENV}
     - name: Wait workflow
       if: false
       run: |
@@ -66,12 +65,12 @@ jobs:
         while [[ ${WF_CONCLUSION} == "null" && ${WF_STATUS} != "\"completed\"" ]]
         do
           sleep 60
-          WF_RESULT=$(curl -X GET "${GITHUB_API_URL}/repos/${{ env.GITHUB_REPOSITORY }}/actions/workflows/${WORKFLOW}/runs" \
+          WF_RESULT=$(curl -s -X GET "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/runs" \
             -H 'Accept: application/vnd.github.antiope-preview+json' \
             -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '.workflow_runs[] | select(.id == '${{ env.WF_ID }}')'
           WF_CONCLUSION=$(echo ${WF_RESULT} | jq '.conclusion')
           WF_STATUS=$(echo ${WF_RESULT} | jq '.status')
-          echo "Waiting for ${GITHUB_SERVER_URL}/${{ env.GITHUB_REPOSITORY }}/actions/runs/${{ env.WF_ID }}"
+          echo "Waiting for ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${{ env.WF_ID }}"
           echo "Conclusion: ${WF_CONCLUSION}"
           echo "Status: ${WF_STATUS}"
         done

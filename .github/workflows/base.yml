@@ -46,7 +46,7 @@ env:
   JAVA_HOME: ${{ github.workspace }}/openjdk
   MANDREL_REPO: ${{ github.workspace }}/mandrel
   MANDREL_HOME: ${{ github.workspace }}/../mandrelvm
-  MX_HOME: ${{ github.workspace }}/mx
+  MX_PATH: ${{ github.workspace }}/mx
   QUARKUS_PATH: ${{ github.workspace }}/quarkus
   MANDREL_PACKAGING_REPO: ${{ github.workspace }}/mandrel-packaging
 
@@ -67,7 +67,7 @@ jobs:
       with:
         repository: graalvm/mx.git
         ref: master
-        path: ${{ env.MX_HOME }}
+        path: ${{ env.MX_PATH }}
     - uses: actions/checkout@v2
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'mandrel' && github.event.inputs.builder-image == 'null' }}
       with:
@@ -94,7 +94,7 @@ jobs:
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'mandrel' && github.event.inputs.builder-image == 'null' }}
       run: |
         ${JAVA_HOME}/bin/java -ea ${MANDREL_PACKAGING_REPO}/build.java \
-          --mx-home ${MX_HOME} \
+          --mx-home ${MX_PATH} \
           --mandrel-repo ${MANDREL_REPO} \
           --mandrel-home ${MANDREL_HOME} \
           --archive-suffix tar.gz
@@ -138,7 +138,7 @@ jobs:
     - name: Build graalvm native-image
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'graalvm' && github.event.inputs.builder-image == 'null' }}
       run: |
-        cd substratevm
+        cd graal/substratevm
         ${MX_PATH}/mx --native=native-image --components="Native Image" build
         mv $(${MX_PATH}/mx --native=native-image --components="Native Image" graalvm-home) ${MANDREL_HOME}
         ${MANDREL_HOME}/bin/native-image --version
