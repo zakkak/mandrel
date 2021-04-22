@@ -3,6 +3,9 @@ name: Mandrel-Quarkus tests
 on:
   workflow_dispatch:
     inputs:
+      name:
+        description: 'The human-friendly name of this workflow'
+        default: "Mandrel-Quarkus tests"
       quarkus-version:
         description: 'Quarkus version to test (branch, tag, commit, or "latest")'
         # "latest" is replaced by the latest release available in maven
@@ -19,9 +22,6 @@ on:
       mandrel-packaging-version:
         description: 'Mandrel packaging version to test (branch, tag, or commit)'
         default: "master"
-      mandrel-packaging-repo:
-        description: 'Mandrel packaging repository to be used'
-        default: 'graalvm/mandrel-packaging'
       distribution:
         description: 'Distribution to build, mandrel or graalvm'
         default: "mandrel"
@@ -51,6 +51,11 @@ env:
   MANDREL_PACKAGING_REPO: ${{ github.workspace }}/mandrel-packaging
 
 jobs:
+  name:
+    name: ${{ github.event.inputs.name }}
+    runs-on: ubuntu-18.04
+    steps:
+      - run: true
   build-mandrel:
     name: Mandrel ${{ github.event.inputs.version }} build - OpenJDK11-${{ github.event.inputs.jdk }}
     runs-on: ubuntu-18.04
@@ -71,7 +76,7 @@ jobs:
     - uses: actions/checkout@v2
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'mandrel' && github.event.inputs.builder-image == 'null' }}
       with:
-        repository: ${{ github.event.inputs.mandrel-packaging-repo }}
+        repository: graalvm/mandrel-packaging
         ref: ${{ github.event.inputs.mandrel-packaging-version }}
         path: ${{ env.MANDREL_PACKAGING_REPO }}
     - uses: actions/cache@v2.1.5

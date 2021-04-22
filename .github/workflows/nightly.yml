@@ -24,13 +24,13 @@ jobs:
       matrix:
         include:
           - name: "Q main Mandrel build of latest graal"
-            inputs: '{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"jdk\": \"ea\"}'
+            inputs: '{"quarkus-version": "main", "version": "graal/master", "jdk": "ea"}'
           - name: "Q main GraalVM CE build of latest graal"
-            inputs: '{\"quarkus-version\": \"main\", \"version\": \"graal/master\", \"distribution\": \"graalvm\"}'
+            inputs: '{"quarkus-version": "main", "version": "graal/master", "distribution": "graalvm"}'
           - name: "Q main Mandrel 20.3 image from quay.io"
-            inputs: '{\"quarkus-version\": \"main\", \"builder-image\": \"quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11\"}'
+            inputs: '{"quarkus-version": "main", "builder-image": "quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11"}'
           - name: "Q main Mandrel 21.0 image from quay.io"
-            inputs: '{\"quarkus-version\": \"main\", \"builder-image\": \"quay.io/quarkus/ubi-quarkus-mandrel:21.0-java11\"}'
+            inputs: '{"quarkus-version": "main", "builder-image": "quay.io/quarkus/ubi-quarkus-mandrel:21.0-java11"}'
           #- name: "Q main Mandrel 20.3 build from source"
           #  inputs: '{\"quarkus-version\": \"main\", \"version\": \"mandrel-20.3.1.2-Final\", \"build-from-source\": \"false\"}'
           #- name: "Q main Mandrel 21.0 build from source"
@@ -40,13 +40,15 @@ jobs:
       timeout-minutes: 10
       run: |
         WF_RESULT="500"
+        INPUTS=$(jq -c '. += {name: "${{ matrix.name }}"}' <<<$(echo '${{ matrix.inputs }}'))
+        echo ${INPUTS}
         while [[ ${WF_RESULT} == "500" ]]
         do
           WF_RESULT=$(curl -s -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches" \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${WORKFLOW_TOKEN}" \
-            -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${{ matrix.inputs }}}" \
+            -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${INPUTS}}" \
             -w "%{http_code}")
           sleep 30 # back off
         done
