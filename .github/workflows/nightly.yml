@@ -37,16 +37,21 @@ jobs:
           #  inputs: '{\"quarkus-version\": \"main\", \"version\": \"mandrel-21.0.0.0-Final\", \"build-from-source\": \"false\"}'
     steps:
     - name: Start workflow
+      timeout-minutes: 10
       run: |
-        WF_RESULT=$(curl -s -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${WORKFLOW_TOKEN}" \
-          -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${{ matrix.inputs }}}" \
-          -w "%{http_code}")
+        WF_RESULT="500"
+        while [[ ${WF_RESULT} == "500" ]]
+        do
+          WF_RESULT=$(curl -s -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/dispatches" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${WORKFLOW_TOKEN}" \
+            -d "{\"ref\":\"${GITHUB_REF}\",\"inputs\":${{ matrix.inputs }}}" \
+            -w "%{http_code}")
+          sleep 30 # back off
+        done
         if [[ ${WF_RESULT} == "204" ]]
         then
-          sleep 30 # wait for the workflow to be scheduled
           WF_ID=$(curl -s -X GET "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW}/runs" \
             -H 'Accept: application/vnd.github.antiope-preview+json' \
             -H "Authorization: Bearer ${WORKFLOW_TOKEN}" | jq '[.workflow_runs[]] | first | .id')
