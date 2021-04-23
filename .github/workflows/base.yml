@@ -301,6 +301,10 @@ jobs:
           path: ${{ env.QUARKUS_PATH }}
       - name: Reclaim disk space
         run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
+      - name: Update Docker Client User Agent
+        shell: bash
+        run: |
+          cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json
       - name: Build with Maven
         env:
           TEST_MODULES: ${{matrix.test-modules}}
