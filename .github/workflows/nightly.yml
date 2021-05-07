@@ -40,8 +40,8 @@ jobs:
           - name: "Q main Mandrel 20.3 image from quay.io"
             inputs: '{"quarkus-version": "main", "builder-image": "quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11"}'
             workflow: 'base.yml'
-          - name: "Q main Mandrel 21.0 image from quay.io"
-            inputs: '{"quarkus-version": "main", "builder-image": "quay.io/quarkus/ubi-quarkus-mandrel:21.0-java11"}'
+          - name: "Q main Mandrel 21.1 image from quay.io"
+            inputs: '{"quarkus-version": "main", "builder-image": "quay.io/quarkus/ubi-quarkus-mandrel:21.1-java11"}'
             workflow: 'base.yml'
           ####
           # Test Quarkus main with supported Mandrel versions using the release archives
