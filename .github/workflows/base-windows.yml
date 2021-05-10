@@ -51,8 +51,7 @@ env:
   MX_PATH: ${{ github.workspace }}\mx
   QUARKUS_PATH: ${{ github.workspace }}\quarkus
   MANDREL_PACKAGING_REPO: ${{ github.workspace }}\mandrel-packaging
-  # leave more space for the actual native compilation and execution
-  MAVEN_OPTS: -Xmx1g
+  MAVEN_OPTS: -Xmx2g -XX:MaxMetaspaceSize=1g
 
 jobs:
   name:
