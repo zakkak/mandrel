@@ -41,7 +41,7 @@ env:
   DB_USER: hibernate_orm_test
   DB_PASSWORD: hibernate_orm_test
   DB_NAME: hibernate_orm_test
-  NATIVE_TEST_MAVEN_OPTS: "-B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml --fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dnative-image.xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
+  NATIVE_TEST_MAVEN_OPTS: "-B --settings .github/mvn-settings.xml --fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dnative-image.xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
   MX_GIT_CACHE: refcache
   JAVA_HOME: ${{ github.workspace }}/openjdk
   MANDREL_REPO: ${{ github.workspace }}/mandrel
@@ -53,12 +53,12 @@ env:
 jobs:
   name:
     name: ${{ github.event.inputs.name }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - run: true
   build-mandrel:
     name: Mandrel ${{ github.event.inputs.version }} build - OpenJDK11-${{ github.event.inputs.jdk }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'mandrel' && github.event.inputs.builder-image == 'null'}}
@@ -114,7 +114,7 @@ jobs:
 
   build-graal:
     name: GraalVM CE ${{ github.event.inputs.version }} build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       if: ${{ github.event.inputs.build-from-source == 'true' && github.event.inputs.distribution == 'graalvm' && github.event.inputs.builder-image == 'null'}}
@@ -159,7 +159,7 @@ jobs:
 
   get-jdk:
     name: Get Mandrel/GraalVM CE ${{ github.event.inputs.version }} or OpenJDK11-${{ github.event.inputs.jdk }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Get Mandrel ${{ github.event.inputs.version }}
       if: ${{ github.event.inputs.build-from-source == 'false' && github.event.inputs.distribution == 'mandrel' && github.event.inputs.builder-image == 'null' }}
@@ -193,7 +193,7 @@ jobs:
 
   get-test-matrix:
     name: Get test matrix
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     outputs:
       quarkus-version: ${{ steps.version.outputs.quarkus-version }}
       tests-matrix: ${{ steps.version.outputs.tests-matrix }}
@@ -216,7 +216,7 @@ jobs:
 
   build-quarkus:
     name: Quarkus ${{ needs.get-test-matrix.outputs.quarkus-version }} - OpenJDK11-${{ github.event.inputs.jdk }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     needs:
       - get-test-matrix
       - build-mandrel
@@ -268,7 +268,7 @@ jobs:
     needs:
       - build-quarkus
       - get-test-matrix
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     # Ignore the following YAML Schema error
     timeout-minutes: ${{matrix.timeout}}
     strategy:
@@ -276,62 +276,74 @@ jobs:
       matrix: ${{ fromJson(needs.get-test-matrix.outputs.tests-matrix) }}
     steps:
       - name: Download Maven Repo
+        if: "!startsWith(matrix.os-name, 'windows')"
         uses: actions/download-artifact@v1
         with:
           name: maven-repo-${{ needs.get-test-matrix.outputs.quarkus-version }}-${{ github.event.inputs.jdk }}
           path: .
       - name: Extract Maven Repo
+        if: "!startsWith(matrix.os-name, 'windows')"
         shell: bash
         run: tar -xzvf maven-repo-${{ needs.get-test-matrix.outputs.quarkus-version }}-${{ github.event.inputs.jdk }}.tgz -C ~
       - name: Download Mandrel or OpenJDK11
+        if: "!startsWith(matrix.os-name, 'windows')"
         uses: actions/download-artifact@v1
         with:
           name: jdk
           path: .
       - name: Extract Mandrel or OpenJDK11
+        if: "!startsWith(matrix.os-name, 'windows')"
         shell: bash
         run: |
           mkdir -p ${JAVA_HOME}
           tar -xzvf jdk.tgz -C ${JAVA_HOME} --strip-components=1
       - uses: actions/checkout@v2
+        if: "!startsWith(matrix.os-name, 'windows')"
         with:
           repository: ${{ github.event.inputs.quarkus-repo }}
           fetch-depth: 1
           ref: ${{ github.event.inputs.quarkus-version }}
           path: ${{ env.QUARKUS_PATH }}
       - name: Reclaim disk space
+        if: "!startsWith(matrix.os-name, 'windows')"
         run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
       - name: Update Docker Client User Agent
+        if: "!startsWith(matrix.os-name, 'windows')"
         shell: bash
         run: |
           cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json
       - name: Build with Maven
+        if: "!startsWith(matrix.os-name, 'windows')"
         env:
           TEST_MODULES: ${{matrix.test-modules}}
           CATEGORY: ${{matrix.category}}
+        shell: bash
         run: |
+          cd ${QUARKUS_PATH}
+          export GRAALVM_HOME="${JAVA_HOME}"
           if [[ ${{ github.event.inputs.builder-image }} == "null" ]]
           then
             export BUILDER_IMAGE=""
+            ${GRAALVM_HOME}/bin/native-image --version
           else
             export BUILDER_IMAGE="-Dquarkus.container-image.build=true -Dquarkus.native.builder-image=${{ github.event.inputs.builder-image }}"
           fi
-          cd ${QUARKUS_PATH}
-          export GRAALVM_HOME="${JAVA_HOME}"
-          if [[ -f ${GRAALVM_HOME}/bin/native-image ]]
+          # Backwards compatibility with Quarkus < 2.x native-tests.json
+          if ! echo $TEST_MODULES | grep ',' > /dev/null
           then
-            ${GRAALVM_HOME}/bin/native-image --version
+            for i in $TEST_MODULES
+            do modules+=("$i"); done
+            IFS=,
+            TEST_MODULES="${modules[*]}"
+            # add the 'simple with spaces' project to the run of 'Misc1' by executing it explicitly
+            # done because there is no good way to pass strings with empty values to the previous command
+            # so this hack is as good as any
+            if [ "$CATEGORY" == "Misc1" ]; then
+              TEST_MODULES="$TEST_MODULES,simple with space"
+            fi
+            unset IFS
           fi
-          for i in $TEST_MODULES
-          do modules+=("integration-tests/$i"); done
-          IFS=,
-          eval mvn -pl "${modules[*]}" $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS
-          # add the 'simple with spaces' project to the run of 'Misc1' by executing it explicitly
-          # done because there is no good way to pass strings with empty values to the previous command
-          # so this hack is as good as any
-          if [ "$CATEGORY" == "Misc1" ]; then
-            mvn -Dnative $BUILDER_IMAGE -B --settings .github/mvn-settings.xml -f 'integration-tests/simple with space/' verify
-          fi
+          ./mvnw -f integration-tests -pl "$TEST_MODULES" $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS
       - name: Prepare failure archive (if maven failed)
         if: failure()
         shell: bash

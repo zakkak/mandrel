@@ -56,7 +56,7 @@ env:
 jobs:
   name:
     name: ${{ github.event.inputs.name }}
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - run: true
 
@@ -262,20 +262,17 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       with:
         repository: ${{ github.event.inputs.quarkus-repo }}
         fetch-depth: 1
         ref: ${{ github.event.inputs.quarkus-version }}
         path: quarkus
     - uses: actions/cache@v2.1.5
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
     - name: Build quarkus
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       run: |
         curl -L https://api.adoptopenjdk.net/v3/binary/latest/11/ga/linux/x64/jdk/hotspot/normal/openjdk -o jdk.tar.gz
         export JAVA_HOME=$(pwd)/openjdk
@@ -286,17 +283,14 @@ jobs:
         cd quarkus
         ./mvnw ${COMMON_MAVEN_ARGS} -Dquickly
     - name: Tar Maven Repo
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       shell: bash
       run: tar -I 'pigz -9' -cf maven-repo.tgz -C ~ .m2/repository
     - name: Persist Maven Repo
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       uses: actions/upload-artifact@v2
       with:
         name: maven-repo
         path: maven-repo.tgz
     - name: Delete Local Artifacts From Cache
-      if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
       shell: bash
       run: rm -r ~/.m2/repository/io/quarkus
 
@@ -313,45 +307,39 @@ jobs:
     timeout-minutes: ${{matrix.timeout}}
     strategy:
       fail-fast: false
-      #matrix: ${{ fromJson(needs.get-test-matrix.outputs.tests-matrix) }}
-      # we only run a native build on Windows for Hibernate Validator just to be sure
-      # that we can build native executables on Windows
-      # matrix: ${{ fromJson(needs.native-tests-read-json-matrix.outputs.matrix) }}
-      matrix:
-        category: [hibernate-validator]
-        include:
-          - category: hibernate-validator
-            timeout: 20
-            test-modules: hibernate-validator
+      matrix: ${{ fromJson(needs.get-test-matrix.outputs.tests-matrix) }}
     steps:
       - name: Download Maven Repo
-        if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
+        if: startsWith(matrix.os-name, 'windows')
         uses: actions/download-artifact@v1
         with:
           name: maven-repo
           path: .
       - name: Extract Maven Repo
-        if: ${{ ! (endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta')) }}
+        if: startsWith(matrix.os-name, 'windows')
         shell: bash
         run: tar -xzf maven-repo.tgz -C ~
       - uses: actions/cache@v2.1.5
-        if: ${{ endsWith(github.event.inputs.quarkus-version, 'Final') || contains(github.event.inputs.quarkus-version, 'Alpha') || contains(github.event.inputs.quarkus-version, 'Beta') }}
+        if: startsWith(matrix.os-name, 'windows')
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
       - name: Download Mandrel or OpenJDK11
+        if: startsWith(matrix.os-name, 'windows')
         uses: actions/download-artifact@v1
         with:
           name: jdk
           path: .
       - name: Extract JDK
+        if: startsWith(matrix.os-name, 'windows')
         shell: bash
         run: |
           mkdir -p "${JAVA_HOME}"
           tar -xzvf jdk.tgz -C openjdk --strip-components=1
           ${JAVA_HOME}/bin/java -version
       - uses: actions/checkout@v2
+        if: startsWith(matrix.os-name, 'windows')
         with:
           repository: ${{ github.event.inputs.quarkus-repo }}
           fetch-depth: 1
@@ -362,10 +350,12 @@ jobs:
       #   run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
       # We do this so we can get better analytics for the downloaded version of the build images
       - name: Update Docker Client User Agent
+        if: startsWith(matrix.os-name, 'windows')
         shell: bash
         run: |
           cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json
       - name: Build with Maven
+        if: startsWith(matrix.os-name, 'windows')
         env:
           TEST_MODULES: ${{matrix.test-modules}}
           CATEGORY: ${{matrix.category}}
@@ -381,15 +371,10 @@ jobs:
           if (Test-Path "$Env:GRAALVM_HOME/bin/native-image" -PathType leaf) {
             & "$Env:GRAALVM_HOME/bin/native-image" --version
           }
-          $do_modules = @()
-          $Env:TEST_MODULES.Split(" ") | ForEach {
-            $do_modules += "integration-tests/$_"
-          }
-          $do_modules = $do_modules -join ","
           $opts=@()
           -split $Env:NATIVE_TEST_MAVEN_OPTS | foreach { $opts += "`"$_`"" }
           #if ( "${{ github.event.inputs.builder-image }}" -eq "null" ) {
-          mvn -pl $do_modules $opts install
+          mvn -f integration-tests -pl "$TEST_MODULES" $opts install
           #} else {
           #  mvn -pl $do_modules "-Dquarkus.native.container-build=true" "-Dquarkus.native.builder-image=${{ github.event.inputs.builder-image }}" $opts package
           #}
