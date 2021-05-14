@@ -326,7 +326,7 @@ jobs:
             export BUILDER_IMAGE=""
             ${GRAALVM_HOME}/bin/native-image --version
           else
-            export BUILDER_IMAGE="-Dquarkus.container-image.build=true -Dquarkus.native.builder-image=${{ github.event.inputs.builder-image }}"
+            export BUILDER_IMAGE="-Dquarkus.native.container-build=true -Dquarkus.native.builder-image=${{ github.event.inputs.builder-image }}"
           fi
           # Backwards compatibility with Quarkus < 2.x native-tests.json
           if ! echo $TEST_MODULES | grep ',' > /dev/null
