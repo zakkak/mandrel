@@ -269,6 +269,9 @@ jobs:
       - build-quarkus
       - get-test-matrix
     runs-on: ubuntu-latest
+    env:
+      # leave more space for the actual native compilation and execution
+      MAVEN_OPTS: -Xmx1g
     # Ignore the following YAML Schema error
     timeout-minutes: ${{matrix.timeout}}
     strategy:
