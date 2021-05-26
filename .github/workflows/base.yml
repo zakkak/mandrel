@@ -41,7 +41,7 @@ env:
   DB_USER: hibernate_orm_test
   DB_PASSWORD: hibernate_orm_test
   DB_NAME: hibernate_orm_test
-  NATIVE_TEST_MAVEN_OPTS: "-B --settings .github/mvn-settings.xml --fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dnative-image.xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
+  NATIVE_TEST_MAVEN_OPTS: "-B --settings .github/mvn-settings.xml --fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dquarkus.native.native-image-xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
   MX_GIT_CACHE: refcache
   JAVA_HOME: ${{ github.workspace }}/openjdk
   MANDREL_REPO: ${{ github.workspace }}/mandrel
