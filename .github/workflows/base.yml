@@ -219,7 +219,7 @@ jobs:
         echo "::set-output name=tests-matrix::${tests_json}"
 
   build-quarkus:
-    name: Quarkus ${{ needs.get-test-matrix.outputs.quarkus-version }} - OpenJDK11-${{ github.event.inputs.jdk }}
+    name: Quarkus ${{ github.event.inputs.quarkus-version }} - OpenJDK11-${{ github.event.inputs.jdk }}
     runs-on: ubuntu-latest
     needs:
       - get-test-matrix
@@ -268,7 +268,7 @@ jobs:
       run: rm -r ~/.m2/repository/io/quarkus
 
   native-tests:
-    name: Q ${{ needs.get-test-matrix.outputs.quarkus-version }} - ${{ matrix.category }} - OpenJDK11-${{ github.event.inputs.jdk }}
+    name: Q ${{ github.event.inputs.quarkus-version }} - ${{ matrix.category }} - OpenJDK11-${{ github.event.inputs.jdk }}
     needs:
       - build-quarkus
       - get-test-matrix
