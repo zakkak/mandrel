@@ -270,8 +270,8 @@ jobs:
     - uses: actions/cache@v2.1.5
       with:
         path: ~/.m2/repository
-        key: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
+        key: base-windows-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: base-windows-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
     - name: Build quarkus
       run: |
         curl -L https://api.adoptopenjdk.net/v3/binary/latest/11/ga/linux/x64/jdk/hotspot/normal/openjdk -o jdk.tar.gz
@@ -319,12 +319,19 @@ jobs:
         if: startsWith(matrix.os-name, 'windows')
         shell: bash
         run: tar -xzf maven-repo.tgz -C ~
+      - uses: actions/checkout@v2
+        if: startsWith(matrix.os-name, 'windows')
+        with:
+          repository: ${{ github.event.inputs.quarkus-repo }}
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.quarkus-version }}
+          path: ${{ env.QUARKUS_PATH }}
       - uses: actions/cache@v2.1.5
         if: startsWith(matrix.os-name, 'windows')
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
+          key: base-windows-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: base-windows-${{ needs.get-test-matrix.outputs.quarkus-version }}-maven-
       - name: Download Mandrel or OpenJDK11
         if: startsWith(matrix.os-name, 'windows')
         uses: actions/download-artifact@v1
@@ -338,13 +345,6 @@ jobs:
           mkdir -p "${JAVA_HOME}"
           tar -xzvf jdk.tgz -C openjdk --strip-components=1
           ${JAVA_HOME}/bin/java -version
-      - uses: actions/checkout@v2
-        if: startsWith(matrix.os-name, 'windows')
-        with:
-          repository: ${{ github.event.inputs.quarkus-repo }}
-          fetch-depth: 1
-          ref: ${{ github.event.inputs.quarkus-version }}
-          path: ${{ env.QUARKUS_PATH }}
       # - name: Reclaim disk space
       #   shell: bash
       #   run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
