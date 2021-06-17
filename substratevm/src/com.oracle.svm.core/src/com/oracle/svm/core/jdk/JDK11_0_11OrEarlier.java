@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,33 +22,17 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.jfr;
+package com.oracle.svm.core.jdk;
 
-import com.oracle.svm.core.annotate.Alias;
-import com.oracle.svm.core.annotate.Substitute;
-import com.oracle.svm.core.annotate.TargetClass;
-import com.oracle.svm.core.annotate.TargetElement;
-import com.oracle.svm.core.jdk.JDK11_0_11OrEarlier;
-import com.oracle.svm.core.jdk.JDK11_0_12OrLater;
-import com.oracle.svm.jfr.traceid.JfrTraceIdEpoch;
+import java.util.function.BooleanSupplier;
 
-import jdk.internal.misc.Unsafe;
+import org.graalvm.compiler.serviceprovider.JavaVersionUtil;
+import org.graalvm.compiler.serviceprovider.GraalServices;
 
-@TargetClass(value = jdk.jfr.internal.StringPool.class, onlyWith = JfrEnabled.class)
-final class Target_jdk_jfr_internal_StringPool {
-
-    @Alias private static Unsafe unsafe;
-
-    @Substitute
-    @TargetElement(onlyWith = JDK11_0_11OrEarlier.class)
-    private static boolean getCurrentEpoch() {
-        long addr = JfrTraceIdEpoch.getInstance().getEpochAddress();
-        return unsafe.getByte(addr) == 1;
-    }
-
-    @Substitute
-    @TargetElement(onlyWith = JDK11_0_12OrLater.class)
-    static long addString(String s) {
-        return -1;
+public class JDK11_0_11OrEarlier implements BooleanSupplier {
+    @Override
+    public boolean getAsBoolean() {
+        return JavaVersionUtil.JAVA_SPEC < 11 ||
+                (JavaVersionUtil.JAVA_SPEC == 11 && GraalServices.getJavaUpdateVersion() <= 11);
     }
 }
