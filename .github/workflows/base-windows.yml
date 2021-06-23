@@ -49,6 +49,7 @@ env:
   MANDREL_REPO: ${{ github.workspace }}\mandrel
   MANDREL_HOME: ${{ github.workspace }}\..\mandrelvm
   MX_PATH: ${{ github.workspace }}\mx
+  MX_PYTHON_VERSION: 3
   QUARKUS_PATH: ${{ github.workspace }}\quarkus
   MANDREL_PACKAGING_REPO: ${{ github.workspace }}\mandrel-packaging
   MAVEN_OPTS: -Xmx2g -XX:MaxMetaspaceSize=1g
