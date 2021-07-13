@@ -491,7 +491,8 @@ def native_unittests_task():
         # GR-24075
         mx_unittest.add_global_ignore_glob('com.oracle.svm.test.ProcessPropertiesTest')
 
-    native_unittest(['--build-args', _native_unittest_features])
+    # We need the -H:+EnableAllSecurityServices for com.oracle.svm.test.SecurityServiceTest
+    native_unittest(['--build-args', _native_unittest_features, '-H:+EnableAllSecurityServices'])
 
 
 def javac_image_command(javac_path):
