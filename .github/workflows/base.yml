@@ -41,7 +41,7 @@ env:
   DB_USER: hibernate_orm_test
   DB_PASSWORD: hibernate_orm_test
   DB_NAME: hibernate_orm_test
-  NATIVE_TEST_MAVEN_OPTS: "-B --settings .github/mvn-settings.xml --fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dquarkus.native.native-image-xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
+  NATIVE_TEST_MAVEN_OPTS: "--fail-at-end -Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dquarkus.native.native-image-xmx=5g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests install -DskipDocs"
   MX_GIT_CACHE: refcache
   JAVA_HOME: ${{ github.workspace }}/openjdk
   MANDREL_REPO: ${{ github.workspace }}/mandrel
@@ -255,7 +255,7 @@ jobs:
     - name: Build quarkus
       run: |
         cd ${QUARKUS_PATH}
-        mvn -e -B -Dquickly
+        mvn -e -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml  -Dquickly
     - name: Tar Maven Repo
       shell: bash
       run: tar -czvf maven-repo-${{ needs.get-test-matrix.outputs.quarkus-version }}-${{ github.event.inputs.jdk }}.tgz -C ~ .m2/repository
@@ -351,7 +351,7 @@ jobs:
             fi
             unset IFS
           fi
-          ./mvnw -f integration-tests -pl "$TEST_MODULES" $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS
+          ./mvnw -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml -f integration-tests -pl "$TEST_MODULES" $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS
       - name: Prepare failure archive (if maven failed)
         if: failure()
         shell: bash
