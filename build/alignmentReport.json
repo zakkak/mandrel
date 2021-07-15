@@ -1,0 +1,16 @@
+{
+  "executionRoot" : {
+    "groupId" : "org.graalvm.sdk",
+    "artifactId" : "graal-sdk",
+    "version" : "21.2.0.0-0-redhat-00001",
+    "originalGAV" : "org.graalvm.sdk:graal-sdk:21.2.0.0-0"
+  },
+  "modules" : [ {
+    "gav" : {
+      "groupId" : "org.graalvm.sdk",
+      "artifactId" : "graal-sdk",
+      "version" : "21.2.0.0-0-redhat-00001",
+      "originalGAV" : "org.graalvm.sdk:graal-sdk:21.2.0.0-0"
+    }
+  } ]
+}
