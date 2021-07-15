@@ -245,7 +245,7 @@ jobs:
         then
           export QUARKUS_VERSION=$(curl https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/latest/ {print $3}')
         else
-          export QUARKUS_VERSION=$(git ls-remote ${GITHUB_SERVER_URL}/${{ github.event.inputs.quarkus-repo }} | grep ${{ github.event.inputs.quarkus-version }} | cut -f 1)
+          export QUARKUS_VERSION=$(git ls-remote ${GITHUB_SERVER_URL}/${{ github.event.inputs.quarkus-repo }} | grep -F ${{ github.event.inputs.quarkus-version }} | cut -f 1)
         fi
         if [ "$QUARKUS_VERSION" == "" ]
         then
