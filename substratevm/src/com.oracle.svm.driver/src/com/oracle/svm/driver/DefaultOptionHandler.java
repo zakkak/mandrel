@@ -80,7 +80,10 @@ class DefaultOptionHandler extends NativeImage.OptionHandler<NativeImage> {
             case "--version":
                 args.poll();
                 singleArgumentCheck(args, headArg);
-                String message = System.getProperty("java.vm.version");
+                String message = "GraalVM Version " + NativeImage.graalvmVersion;
+                if (!NativeImage.graalvmConfig.isEmpty()) {
+                    message += " " + NativeImage.graalvmConfig;
+                }
                 message += " (Java Version " + javaRuntimeVersion + ")";
                 nativeImage.showMessage(message);
                 System.exit(0);
