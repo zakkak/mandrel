@@ -1,7 +1,7 @@
 suite = {
     "mxversion": "5.270.0",
     "name": "substratevm",
-    "version" : "20.3.2.1",
+    "version" : "20.3.3.0",
     "release" : False,
     "url" : "https://github.com/oracle/graal/tree/master/substratevm",
 
@@ -425,9 +425,6 @@ suite = {
                     },
                 },
                 "<others>": {
-                    "sparcv9": {
-                        "ignore": "sparcv9 is not supported",
-                    },
                     "<others>": {
                         "cflags": ["-g", "-fPIC", "-O2", "-D_LITTLE_ENDIAN", "-ffunction-sections", "-fdata-sections", "-fvisibility=hidden", "-D_FORTIFY_SOURCE=0"],
                     },
@@ -464,9 +461,6 @@ suite = {
                     },
                 },
                 "linux": {
-                    "sparcv9": {
-                        "ignore": "sparcv9 is not supported",
-                    },
                     "<others>" : {
                         "cflags": ["-g", "-fPIC", "-O2", "-ffunction-sections", "-fdata-sections", "-fvisibility=hidden", "-D_FORTIFY_SOURCE=0"],
                     },
