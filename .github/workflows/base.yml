@@ -255,7 +255,7 @@ jobs:
     - name: Build quarkus
       run: |
         cd ${QUARKUS_PATH}
-        mvn -e -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml  -Dquickly
+        mvn -e -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml -Dquickly -Dno-test-modules
     - name: Tar Maven Repo
       shell: bash
       run: tar -czvf maven-repo-${{ needs.get-test-matrix.outputs.quarkus-version }}-${{ github.event.inputs.jdk }}.tgz -C ~ .m2/repository

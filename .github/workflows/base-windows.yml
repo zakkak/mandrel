@@ -286,7 +286,7 @@ jobs:
         tar xf jdk.tar.gz -C ${JAVA_HOME} --strip-components=1
         ${JAVA_HOME}/bin/java -version
         cd quarkus
-        ./mvnw ${COMMON_MAVEN_ARGS} -Dquickly
+        ./mvnw ${COMMON_MAVEN_ARGS} -Dquickly -Dno-test-modules
     - name: Tar Maven Repo
       shell: bash
       run: tar -I 'pigz -9' -cf maven-repo.tgz -C ~ .m2/repository
