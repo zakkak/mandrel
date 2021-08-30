@@ -1,0 +1,7 @@
+{
+  "group" : "org.graalvm.sdk",
+  "name" : "graal-sdk",
+  "projectPathName" : "graal-sdk",
+  "version" : "21.2.0.1-0-redhat-00001",
+  "originalVersion" : "21.2.0.1-0"
+}
