@@ -124,6 +124,7 @@ def test():
 
     # define some useful patterns
     address_pattern = '0x[0-9a-f]+'
+    maybe_address_pattern = '0x[0-9a-f]*'
     hex_digits_pattern = '[0-9a-f]+'
     spaces_pattern = '[ \t]+'
     maybe_spaces_pattern = '[ \t]*'
@@ -426,14 +427,13 @@ def test():
 
     # run backtrace to check we are in java.io.PrintStream::println(java.lang.String)
     # expect "#0  java.io.PrintStream::println(java.lang.String).* at java.base/java/io/PrintStream.java:[0-9]+"
-    exec_string = execute("backtrace 5")
+    exec_string = execute("backtrace 6")
     rexp = [r"#0%sjava\.io\.PrintStream::println\(java\.lang\.String \*\)%s at %sjava/io/PrintStream.java:%s"%(spaces_pattern, wildcard_pattern, wildcard_pattern, digits_pattern),
             r"#1%s%s in hello\.SubstituteHelperClass::nestedGreet\(void\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:59"%(spaces_pattern, address_pattern),
-            # FIXME: Ideally we should see the following two lines in the backtrace as well!
-            # r"#2%s%s in hello\.SubstituteHelperClass::staticInlineGreet\(void\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:53"%(digits_pattern, spaces_pattern, address_pattern),
-            # r"#3%s%s in hello\.SubstituteHelperClass::inlineGreet\(void\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:48"%(digits_pattern, spaces_pattern, address_pattern),
-            r"#%s%s%s in hello\.Hello\$DefaultGreeter::greet\(void\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:39"%(digits_pattern, spaces_pattern, address_pattern),
-            r"#%s%s%s in hello\.Hello::main\(java\.lang\.String\[\] \*\) \(\) at hello/Hello\.java:70"%(digits_pattern, spaces_pattern, address_pattern)]
+            r"#2%s%s in hello\.SubstituteHelperClass::staticInlineGreet\(\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:53"%(spaces_pattern, address_pattern),
+            r"#3%s%s in hello\.SubstituteHelperClass::inlineGreet\(\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:48"%(spaces_pattern, maybe_address_pattern),
+            r"#4%s%s in hello\.Hello\$DefaultGreeter::greet\(void\) \(\) at hello/Target_hello_Hello_DefaultGreeter\.java:40"%(spaces_pattern, maybe_address_pattern),
+            r"#5%s%s in hello\.Hello::main\(java\.lang\.String\[\] \*\) \(\) at hello/Hello\.java:70"%(spaces_pattern, address_pattern)]
     checker = Checker("backtrace PrintStream::println", rexp)
     checker.check(exec_string)
 
