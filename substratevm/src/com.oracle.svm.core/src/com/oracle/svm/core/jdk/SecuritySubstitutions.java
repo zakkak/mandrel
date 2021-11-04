@@ -28,6 +28,10 @@ import static com.oracle.svm.core.snippets.KnownIntrinsics.readCallerStackPointe
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.security.AccessControlContext;
 import java.security.CodeSource;
@@ -41,9 +45,11 @@ import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
 import java.security.Provider;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.graalvm.compiler.serviceprovider.JavaVersionUtil;
 import org.graalvm.nativeimage.Platform;
@@ -54,9 +60,11 @@ import org.graalvm.word.Pointer;
 import com.oracle.svm.core.SubstrateUtil;
 import com.oracle.svm.core.annotate.Alias;
 import com.oracle.svm.core.annotate.Delete;
+import com.oracle.svm.core.annotate.Inject;
 import com.oracle.svm.core.annotate.InjectAccessors;
 import com.oracle.svm.core.NeverInline;
 import com.oracle.svm.core.annotate.RecomputeFieldValue;
+import com.oracle.svm.core.annotate.RecomputeFieldValue.Kind;
 import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import com.oracle.svm.core.annotate.TargetElement;
@@ -65,6 +73,9 @@ import com.oracle.svm.core.thread.Target_java_lang_Thread;
 import com.oracle.svm.core.util.VMError;
 import com.oracle.svm.util.ReflectionUtil;
 
+import jdk.vm.ci.meta.MetaAccessProvider;
+import jdk.vm.ci.meta.ResolvedJavaField;
+// Checkstyle: stop
 import sun.security.jca.ProviderList;
 import sun.security.util.SecurityConstants;
 
@@ -370,6 +381,10 @@ final class Target_javax_crypto_JceSecurity {
         } else if (o != null) {
             return (Exception) o;
         }
+        // For the FIPS case the SunPKCS11-NSS provider is a valid and verified provider
+        if (NssConfig.IS_FIPS && NssConfig.SunPKCS_NSS_FIPS_NAME.equals(p.getName())) {
+            return null;
+        }
         /* End code block copied from original method. */
         /*
          * If the verification result is not found in the verificationResults map JDK proceeds to
@@ -398,6 +413,40 @@ final class Target_javax_crypto_JceSecurity_IdentityWrapper {
     @Alias //
     Target_javax_crypto_JceSecurity_IdentityWrapper(Provider obj) {
         this.obj = obj;
+    }
+}
+
+/**
+ * This only applies to JDK8 and JDK11. Experimental FIPS mode in the SunJSSE Provider was removed
+ * in JDK-8217835. Going forward it is recommended to configure FIPS 140 compliant cryptography
+ * providers by using the usual JCA providers configuration mechanism.
+ */
+@TargetClass(className = "sun.security.ssl.SunJSSE", onlyWith = {JDK11OrLater.class, FipsEnabled.class})
+@SuppressWarnings({"unused"})
+final class Target_sun_security_ssl_SunJSSE {
+    @Alias //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrEarlier.class}) //
+    @RecomputeFieldValue(kind = Kind.Reset) //
+    static Provider cryptoProvider;
+
+    @Alias //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrEarlier.class}) //
+    @RecomputeFieldValue(kind = Kind.Reset) //
+    static Boolean fips;
+
+    @Substitute
+    @TargetElement(onlyWith = {FipsDisabled.class, JDK11OrEarlier.class})
+    private Target_sun_security_ssl_SunJSSE(java.security.Provider cryptoProvider, String providerName) {
+        throw VMError.unsupportedFeature("Experimental FIPS mode in the SunJSSE Provider is deprecated (JDK-8217835)." +
+                        " To register a FIPS provider use the supported java.security.Security.addProvider() API.");
+    }
+
+    @Alias
+    @TargetElement(name = TargetElement.CONSTRUCTOR_NAME)
+    native void originalConstructor();
+
+    public Target_sun_security_ssl_SunJSSE() {
+        originalConstructor();
     }
 }
 
@@ -599,12 +648,40 @@ final class Target_sun_security_provider_PolicySpiFile {
 final class Target_sun_security_provider_PolicyFile {
 }
 
+@TargetClass(className = "sun.security.pkcs11.SunPKCS11", onlyWith = {JDK11OrLater.class, FipsDisabled.class})
+@SuppressWarnings({"unused"})
+final class Target_sun_security_pkcs11_SunPKCS11_NON_FIPS {
+
+    @Alias
+    public Target_sun_security_pkcs11_SunPKCS11_NON_FIPS() {
+        throw VMError.unsupportedFeature("sun.security.pkcs11.SunPKCS11 is not supported in non-FIPS mode!");
+    }
+}
+
 @TargetClass(className = "sun.security.jca.ProviderConfig")
 @SuppressWarnings({"unused", "static-method"})
 final class Target_sun_security_jca_ProviderConfig {
 
     @Alias //
-    private String provName;
+    String provName;
+
+    @Alias //
+    String argument;
+
+    @Alias //
+    @TargetElement(onlyWith = FipsEnabled.class) //
+    @InjectAccessors(SunPKCS11ProviderAccessors.class) //
+    volatile Provider provider;
+
+    @Inject //
+    @TargetElement(onlyWith = FipsEnabled.class) //
+    @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.Reset) //
+    volatile Provider injectedProvider;
+
+    @Inject //
+    @TargetElement(onlyWith = FipsEnabled.class) //
+    @RecomputeFieldValue(kind = Kind.Custom, declClass = NeedsReinitializationProvider.class) //
+    volatile int needsReinitialization;
 
     /**
      * All security providers used in a native-image must be registered during image build time. At
@@ -620,6 +697,9 @@ final class Target_sun_security_jca_ProviderConfig {
     private Provider doLoadProvider() {
         throw VMError.unsupportedFeature("Cannot load new security provider at runtime: " + provName + ".");
     }
+
+    @Alias //
+    native Provider getProvider();
 }
 
 @SuppressWarnings("unused")
@@ -628,21 +708,66 @@ final class Target_sun_security_jca_ProviderConfig_ProviderLoader {
     @Alias//
     @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.NewInstance, isFinal = true)//
     static Target_sun_security_jca_ProviderConfig_ProviderLoader INSTANCE;
+
 }
 
-/**
- * This only applies to JDK8 and JDK11. Experimental FIPS mode in the SunJSSE Provider was removed
- * in JDK-8217835. Going forward it is recommended to configure FIPS 140 compliant cryptography
- * providers by using the usual JCA providers configuration mechanism.
- */
-@SuppressWarnings("unused")
-@TargetClass(value = sun.security.ssl.SunJSSE.class, onlyWith = JDK11OrEarlier.class)
-final class Target_sun_security_ssl_SunJSSE {
+class SunPKCS11ProviderAccessors {
 
-    @Substitute
-    private Target_sun_security_ssl_SunJSSE(java.security.Provider cryptoProvider, String providerName) {
-        throw VMError.unsupportedFeature("Experimental FIPS mode in the SunJSSE Provider is deprecated (JDK-8217835)." +
-                        " To register a FIPS provider use the supported java.security.Security.addProvider() API.");
+    static Provider getProvider(Target_sun_security_jca_ProviderConfig obj) {
+        if (obj.needsReinitialization != NeedsReinitializationProvider.STATUS_REINITIALIZED) {
+            reinitialize(obj);
+        }
+        return obj.injectedProvider;
+    }
+
+    static void setProvider(Target_sun_security_jca_ProviderConfig obj, Provider newVal) {
+        obj.injectedProvider = newVal;
+    }
+
+    @SuppressWarnings("unused")
+    private static synchronized void reinitialize(Target_sun_security_jca_ProviderConfig obj) {
+        if (obj.needsReinitialization != NeedsReinitializationProvider.STATUS_NEEDS_REINITIALIZATION) {
+            /* Field initialized is volatile, so double-checked locking is OK. */
+            return;
+        }
+        /*
+         * The original constructor reads fields immediately after writing, so we need to make sure
+         * that we do not enter this re-initialization code recursively.
+         */
+        obj.needsReinitialization = NeedsReinitializationProvider.STATUS_IN_REINITIALIZATION;
+
+        /*
+         * FIPS mode needs to support the SunPKCS11 provider with its NSS linkage
+         * (SunPKCS11-NSS-FIPS). As a corollary, the SunJSSE provider needs to be initialized in
+         * FIPS mode as well. Both are handled here and created at image runtime so as to have
+         * proper runtime linkage to nss libraries.
+         *
+         * We need to runtime-initialize them as they are retrieved via the ProviderConfig API at
+         * image build time. We no longer have access to the build-time-inited ProviderConfigs as
+         * some instances would hold references to SunPKCS11 which are banned due to runtime-reinit
+         * config. Thus, we need to hand-craft-initialization here so they become properly set up so
+         * they can be used at image run time.
+         *
+         * Note that we delegate to ProviderConfig.getProvider() which will give us access to
+         * built-time initialized providers (and which don't need to be created at runtime). This is
+         * the same as they would normally work outside the FIPS config.
+         */
+        JSSEProviderSupport providerSupport = JSSEProviderSupport.singleton();
+        if (obj.provName.equals(NssConfig.SunPKCS_NSS_FIPS_NAME)) {
+            obj.injectedProvider = providerSupport.getSunPKCSProvider();
+        } else if (obj.provName.contains("SunEC")) {
+            obj.injectedProvider = providerSupport.getSunECProvider();
+        } else if (obj.provName.equals("SunJSSE") || obj.provName.equals("com.sun.net.ssl.internal.ssl.Provider")) {
+            obj.injectedProvider = providerSupport.getFipsJSSEProvider();
+        } else {
+            obj.injectedProvider = obj.getProvider();
+        }
+
+        /*
+         * Now the object is completely re-initialized and can be used by any thread without
+         * entering the synchronized slow path again.
+         */
+        obj.needsReinitialization = NeedsReinitializationProvider.STATUS_REINITIALIZED;
     }
 }
 
