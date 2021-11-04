@@ -24,6 +24,7 @@
  */
 package com.oracle.svm.core.jdk;
 
+import java.security.Security;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -104,6 +105,19 @@ public abstract class SystemPropertiesSupport {
         initializeProperty("java.vm.version", ImageSingletons.lookup(VM.class).version);
         initializeProperty("java.vendor", "Oracle Corporation");
         initializeProperty("java.vendor.url", "https://www.graalvm.org/");
+        if (FipsUtil.get().isFipsEnabled()) {
+            // See code in SystemConfigurator.java of the FIPS OpenJDK patches (RHBZ#1655466)
+            String keystoreTypeValue = Security.getProperty("keystore.type");
+            if ("PKCS11".equals(keystoreTypeValue)) {
+                // If keystore.type is PKCS11, javax.net.ssl.keyStore
+                // must be "NONE". See JDK-8238264.
+                initializeProperty("javax.net.ssl.keyStore", "NONE");
+            }
+            // GraalVM handles javax.net.ssl.trustStoreType via
+            // Target_sun_security_ssl_TrustStoreManagerXXX so leave that property
+            // alone. This is different to OpenJDK. See also:
+            // https://www.graalvm.org/reference-manual/native-image/CertificateManagement/#runtime-options
+        }
 
         initializeProperty("java.class.path", "");
         initializeProperty("java.endorsed.dirs", "");
