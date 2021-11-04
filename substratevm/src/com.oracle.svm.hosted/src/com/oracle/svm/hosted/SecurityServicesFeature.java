@@ -30,9 +30,11 @@ import static com.oracle.svm.hosted.SecurityServicesFeature.SecurityServicesPrin
 import static com.oracle.svm.hosted.SecurityServicesFeature.SecurityServicesPrinter.indent;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -98,9 +100,12 @@ import com.oracle.graal.pointsto.reports.ReportUtils;
 import com.oracle.svm.core.SubstrateOptions;
 import com.oracle.svm.core.TypeResult;
 import com.oracle.svm.core.annotate.AutomaticFeature;
+import com.oracle.svm.core.jdk.FipsUtil;
 import com.oracle.svm.core.jdk.JNIRegistrationUtil;
 import com.oracle.svm.core.jdk.NativeLibrarySupport;
+import com.oracle.svm.core.jdk.NssConfig;
 import com.oracle.svm.core.jdk.PlatformNativeLibrarySupport;
+import com.oracle.svm.core.jdk.Resources;
 import com.oracle.svm.core.jdk.SecurityProvidersFilter;
 import com.oracle.svm.core.jni.JNIRuntimeAccess;
 import com.oracle.svm.core.option.HostedOptionKey;
@@ -157,6 +162,12 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
     private static final String X509 = "X.509";
     private static final String[] emptyStringArray = new String[0];
 
+    /*
+     * Utility providers used by the SunPKCS11 provider in FIPS mode
+     */
+    private static final String SUNRSASIGN_PROVIDER = "sun.security.rsa.SunRsaSign";
+    private static final String SUNJCE_PROVIDER = "com.sun.crypto.provider.SunJCE";
+
     /** The list of known service classes defined by the JCA. */
     private static final Class<?>[] knownServices = {AlgorithmParameterGenerator.class, AlgorithmParameters.class,
                     CertPathBuilder.class, CertPathValidator.class, CertStore.class, CertificateFactory.class,
@@ -197,7 +208,10 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
     public void afterRegistration(AfterRegistrationAccess a) {
         ModuleSupport.exportAndOpenPackageToClass("java.base", "sun.security.x509", false, getClass());
         ModuleSupport.openModuleByClass(Security.class, getClass());
-        disableExperimentalFipsMode(a);
+        // disable hook for disabling experimental FIPS support only in non-FIPS
+        if (!FipsUtil.get().isFipsEnabled()) {
+            disableExperimentalFipsMode(a);
+        }
         ImageSingletons.add(SecurityProvidersFilter.class, this);
     }
 
@@ -285,6 +299,19 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
          */
         optionalClazz(access, "sun.security.ssl.Debug").ifPresent(c -> rci.rerunInitialization(c, "for reading properties at run time"));
         optionalClazz(access, "sun.security.ssl.SSLLogger").ifPresent(c -> rci.rerunInitialization(c, "for reading properties at run time"));
+
+        /*
+         * PKCS11 support which is being used in FIPS mode; Note that core JDK classes are
+         * initialized at build time. See JDKInitializationFeature. Therefore, we need to re-run
+         * initializion for classes with references to native structures as we'd get segfaults
+         * otherwise
+         */
+        if (FipsUtil.get().isFipsEnabled()) {
+            rci.rerunInitialization(clazz(access, "sun.security.pkcs11.Secmod"), "reinit at runtime for PKCS11 wrapper");
+            rci.rerunInitialization(clazz(access, "sun.security.pkcs11.SunPKCS11"), "reinit at runtime for PKCS11");
+            rci.rerunInitialization(clazz(access, "sun.security.pkcs11.FIPSKeyImporter"), "reinit at runtime for PKCS11");
+            rci.rerunInitialization(clazz(access, "sun.security.pkcs11.wrapper.PKCS11"), "for initializing native lib (nss) at runtime");
+        }
     }
 
     @Override
@@ -303,6 +330,41 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
                             method(access, "sun.security.ec.ECDSASignature", "verifySignedDigest", byte[].class, byte[].class, byte[].class, byte[].class));
             /* Ensure native calls to sun_security_ec* will be resolved as builtIn. */
             PlatformNativeLibrarySupport.singleton().addBuiltinPkgNativePrefix("sun_security_ec");
+        }
+        if (JavaVersionUtil.JAVA_SPEC < 13 && FipsUtil.get().isFipsEnabled()) {
+            // https://bugs.openjdk.java.net/browse/JDK-8217835
+
+            /*
+             * Register linking of j2pkcs11.a for any Secmod or PKCS11 native methods being called
+             */
+            Class<?> pkcs11Class = access.findClassByName("sun.security.pkcs11.wrapper.PKCS11");
+            Class<?> secmodClass = access.findClassByName("sun.security.pkcs11.Secmod");
+            Object[] pkcs11NativeMethods = Arrays.stream(pkcs11Class.getDeclaredMethods()).filter(m -> Modifier.isNative(m.getModifiers())).toArray();
+            Object[] secmodNativeMethods = Arrays.stream(secmodClass.getDeclaredMethods()).filter(m -> Modifier.isNative(m.getModifiers())).toArray();
+            access.registerReachabilityHandler(SecurityServicesFeature::linkPKCS11,
+                            pkcs11NativeMethods);
+            access.registerReachabilityHandler(SecurityServicesFeature::linkPKCS11,
+                            secmodNativeMethods);
+
+            /*
+             * Some operations from the SunPKCS11 provider use the SunRsaSign and SunJCE providers
+             * via P11Util class. Register a reachability handler for the reflective calls if either
+             * one of the P11Util static methods for getting those providers are being reachable.
+             * Note that the SUN provider will be available in FIPS mode, so we don't have to
+             * account for it.
+             */
+            Class<?> p11UtilClass = access.findClassByName("sun.security.pkcs11.P11Util");
+            Method providerFactoryMethod = ReflectionUtil.lookupMethod(p11UtilClass, "getSunJceProvider");
+            access.registerReachabilityHandler(a -> registerForReflection(clazz(a, SUNJCE_PROVIDER)), providerFactoryMethod);
+            providerFactoryMethod = ReflectionUtil.lookupMethod(p11UtilClass, "getSunRsaSignProvider");
+            access.registerReachabilityHandler(a -> registerForReflection(clazz(a, SUNRSASIGN_PROVIDER)), providerFactoryMethod);
+
+            /*
+             * Ensure native calls to sun_security_pkcs11_wrapper_PKCS11* and
+             * sun_security_pkcs11_Secmod* are resolved as built-in.
+             */
+            PlatformNativeLibrarySupport.singleton().addBuiltinPkgNativePrefix("sun_security_pkcs11_wrapper_PKCS11");
+            PlatformNativeLibrarySupport.singleton().addBuiltinPkgNativePrefix("sun_security_pkcs11_Secmod");
         }
 
         if (isPosix()) {
@@ -335,7 +397,24 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
         }
     }
 
+    public boolean shouldRemoveProviderAllowSunPKCS11(Provider p) {
+        if (FipsUtil.get().isFipsEnabled() && NssConfig.SunPKCS_NSS_FIPS_NAME.equals(p.getName())) {
+            return false;
+        }
+        return shouldRemoveProvider(p);
+    }
+
     public boolean shouldRemoveProvider(Provider p) {
+        /*
+         * Do not cache verification results for the SunPKCS11 provider as that provider is not
+         * allowed in the image heap in FIPS mode. Note that by unconditionally removing that
+         * provider from the verification cache we ensure that it's not being set as a verified
+         * provider. Should a request to actually verify the SunPKCS11 provider be attempted we fail
+         * via the substitution in JCESecurity.getVerificationResult()
+         */
+        if (FipsUtil.get().isFipsEnabled() && NssConfig.SunPKCS_NSS_FIPS_NAME.equals(p.getName())) {
+            return true;
+        }
         if (usedProviders.contains(p)) {
             return false;
         }
@@ -357,12 +436,21 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
     public ProviderList cleanUnregisteredProviders(ProviderList providerList) {
         if (shouldFilterProviders) {
             List<Provider> filteredProviders = new ArrayList<>(providerList.providers());
-            filteredProviders.removeIf(this::shouldRemoveProvider);
+            Predicate<? super Provider> tmpPredicate = this::shouldRemoveProvider;
+            if (FipsUtil.get().isFipsEnabled()) {
+                /*
+                 * SunPKCS11 is always needed in FIPS mode. shouldRemoveProvider() cannot be relied
+                 * on as we use that as a hack to not add it as a verified provider in the cache
+                 */
+                tmpPredicate = this::shouldRemoveProviderAllowSunPKCS11;
+            }
+            final Predicate<? super Provider> removeProviderPredicate = tmpPredicate;
+            filteredProviders.removeIf(removeProviderPredicate);
             if (filteredProviderList == null || !filteredProviderList.providers().equals(filteredProviders)) {
                 filteredProviderList = ProviderList.newList(filteredProviders.toArray(new Provider[0]));
                 if (Options.TraceSecurityServices.getValue()) {
                     removedProviders = new ArrayList<>(providerList.providers());
-                    removedProviders.removeIf(provider -> !shouldRemoveProvider(provider));
+                    removedProviders.removeIf(provider -> !removeProviderPredicate.test(provider));
                 }
             }
         }
@@ -386,7 +474,6 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
     private static void linkSunEC(DuringAnalysisAccess a) {
         NativeLibraries nativeLibraries = ((DuringAnalysisAccessImpl) a).getNativeLibraries();
         /* We statically link sunec thus we classify it as builtIn library */
-        PlatformNativeLibrarySupport.singleton();
         NativeLibrarySupport.singleton().preregisterUninitializedBuiltinLibrary("sunec");
 
         nativeLibraries.addStaticJniLibrary("sunec");
@@ -442,6 +529,99 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
         JNIRuntimeAccess.register(method(a, "sun.security.mscapi.CPublicKey", "of", String.class, long.class, long.class, int.class));
     }
 
+    /**
+     * Set up proper runtime JNI config for FIPS support via the SunPKCS11 provider. Ony used in
+     * FIPS mode.
+     *
+     * @param a
+     */
+    private static void linkPKCS11(DuringAnalysisAccess a) {
+        JNIRuntimeAccess.register(fields(a, "sun.security.pkcs11.wrapper.PKCS11", "pNativeData"));
+
+        /*
+         * Register pkcs11 classes and all fields reachable via JNI as
+         * sun.security.pkcs11.wrapper.PKCS11.initializeLibrary() triggers loading (some of) them
+         */
+        Class<?>[] clazzes = new Class[]{
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_CCM_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SSL3_MASTER_KEY_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_RSA_PKCS_OAEP_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_AES_CTR_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.PKCS11"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SSL3_KEY_MAT_OUT"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SSL3_RANDOM_DATA"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_X9_42_DH2_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.PKCS11Exception"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_ECDH2_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_MECHANISM"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_TLS_PRF_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_TOKEN_INFO"),
+                        clazz(a, "sun.security.pkcs11.wrapper.Functions"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_PKCS5_PBKD2_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_GCM_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_RSA_PKCS_PSS_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_ECDH1_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SSL3_KEY_MAT_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_MECHANISM_INFO"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_X9_42_DH1_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SLOT_INFO"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_VERSION"),
+                        clazz(a, "sun.security.pkcs11.wrapper.Constants"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_TLS12_MASTER_KEY_DERIVE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_SESSION_INFO"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_DATE"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_INFO"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_ATTRIBUTE"),
+                        clazz(a, "sun.security.pkcs11.wrapper.PKCS11RuntimeException"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_C_INITIALIZE_ARGS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_TLS_MAC_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_PBE_PARAMS"),
+                        clazz(a, "sun.security.pkcs11.wrapper.CK_TLS12_KEY_MAT_PARAMS")
+        };
+        for (Class<?> c : clazzes) {
+            Field[] fields = c.getDeclaredFields();
+            JNIRuntimeAccess.register(fields);
+            JNIRuntimeAccess.register(c.getDeclaredConstructors());
+        }
+        // ArrayList, Long, Boolean classes are used by j2pkcs11 JNI
+        Class<?>[] basicClasses = new Class<?>[]{clazz(a, "java.lang.Boolean"), clazz(a, "java.lang.Long"), clazz(a, "java.util.ArrayList")};
+        for (Class<?> c : basicClasses) {
+            for (Method m : c.getDeclaredMethods()) {
+                JNIRuntimeAccess.register(m);
+            }
+        }
+        List<Constructor<?>> basicCtors = new ArrayList<>(Arrays.asList(Object.class.getDeclaredConstructors()));
+        basicCtors.addAll(Arrays.asList(ArrayList.class.getDeclaredConstructors()));
+        basicCtors.addAll(Arrays.asList(Long.class.getDeclaredConstructors()));
+        basicCtors.addAll(Arrays.asList(Boolean.class.getDeclaredConstructors()));
+        Class<?> secmodModuleClass = clazz(a, "sun.security.pkcs11.Secmod$Module");
+        basicCtors.addAll(Arrays.asList(secmodModuleClass.getDeclaredConstructors()));
+        Class<?> pkcsExceptionClass = clazz(a, "sun.security.pkcs11.wrapper.PKCS11Exception");
+        basicCtors.addAll(Arrays.asList(pkcsExceptionClass.getDeclaredConstructors()));
+        for (Constructor<?> c : basicCtors) {
+            JNIRuntimeAccess.register(c);
+        }
+
+        NativeLibraries nativeLibraries = ((DuringAnalysisAccessImpl) a).getNativeLibraries();
+        /* We statically link j2pkcs11 thus we classify it as builtIn library */
+        NativeLibrarySupport.singleton().preregisterUninitializedBuiltinLibrary("j2pkcs11");
+
+        nativeLibraries.addStaticJniLibrary("j2pkcs11");
+
+        // Finally add the nss.fips.cfg resource so that it will be available at runtime
+        addFipsConfigResource();
+    }
+
+    private static void addFipsConfigResource() {
+        String config = NssConfig.get();
+        File nssConfig = new File(config);
+        try (FileInputStream fis = new FileInputStream(nssConfig)) {
+            Resources.registerResource(NssConfig.CONFIG_FILE_NAME, fis);
+        } catch (IOException e) {
+            VMError.shouldNotReachHere("Failure reading NSS config file " + config + ". Reason: " + e.getMessage());
+        }
+    }
+
     private static void linkJaas(DuringAnalysisAccess a) {
         JNIRuntimeAccess.register(fields(a, "com.sun.security.auth.module.UnixSystem", "username", "uid", "gid", "groups"));
 
@@ -466,7 +646,7 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
     private void registerServiceReachabilityHandlers(BeforeAnalysisAccess access) {
         ctrParamClassAccessor = getConstructorParameterClassAccessor(loader);
         getSpiClassMethod = getSpiClassMethod();
-        availableServices = computeAvailableServices();
+        availableServices = computeAvailableServices(access);
 
         /*
          * The JCA defines the list of standard service classes available in the JDK. Each service
@@ -558,9 +738,21 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
      * Collect available services, organized by service type. JDK doesn't have a way to iterate
      * services by type so we need to build our own structure.
      */
-    private static Map<String, Set<Service>> computeAvailableServices() {
+    private static Map<String, Set<Service>> computeAvailableServices(BeforeAnalysisAccess access) {
         Map<String, Set<Service>> availableServices = new HashMap<>();
-        for (Provider provider : Security.getProviders()) {
+        List<Provider> providers = new ArrayList<>(Arrays.asList(Security.getProviders()));
+        if (FipsUtil.get().isFipsEnabled()) {
+            /*
+             * SunPKCS11 provider used in FIPS mode uses SunJCE and SunRsaSign as utility providers
+             * via reflection. Mark them as available and let static analysis figure out whether
+             * they're used. Note that's almost always the case. We need to add them to the
+             * available services list, since that list is later consulted when override
+             * reachability handlers are registered and used services determined.
+             */
+            providers.add((Provider) ReflectionUtil.newInstance(clazz(access, SUNJCE_PROVIDER)));
+            providers.add((Provider) ReflectionUtil.newInstance(clazz(access, SUNRSASIGN_PROVIDER)));
+        }
+        for (Provider provider : providers) {
             for (Service s : provider.getServices()) {
                 availableServices.computeIfAbsent(s.getType(), t -> new HashSet<>()).add(s);
             }
