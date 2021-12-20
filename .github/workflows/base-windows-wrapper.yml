@@ -64,6 +64,6 @@ jobs:
       mandrel-packaging-version: ${{ github.event.inputs.mandrel-packaging-version }}
       mandrel-packaging-repo: ${{ github.event.inputs.mandrel-packaging-repo }}
       distribution: ${{ github.event.inputs.distribution }}
-      build-from-source: ${{ github.event.inputs.build-from-source }}
+      build-from-source: ${{ fromJson(github.event.inputs.build-from-source) }}
       jdk: ${{ github.event.inputs.jdk }}
       builder-image: ${{ github.event.inputs.builder-image }}

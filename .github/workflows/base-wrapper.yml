@@ -1,10 +1,9 @@
-name: Mandrel-Quarkus tests wrapper
-
 # Enable base.yml to be executed as a dispatch workflow with:
 #
 # gh workflow run base-wrapper.yml \
 #  -f quarkus-repo=gsmet/quarkus -f quarkus-version=2.2.4-backports-1 \
 #  -f builder-image="quay.io/quarkus/ubi-quarkus-mandrel:21.3-java11"
+name: Mandrel-Quarkus tests wrapper
 
 on:
   workflow_dispatch:
@@ -58,13 +57,13 @@ jobs:
   delegate:
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
-      quarkus-version: "${{ github.event.inputs.quarkus-version }}"
-      quarkus-repo: "${{ github.event.inputs.quarkus-repo }}"
-      repo: "${{ github.event.inputs.repo }}"
-      version: "${{ github.event.inputs.version }}"
-      mandrel-packaging-version: "${{ github.event.inputs.mandrel-packaging-version }}"
-      mandrel-packaging-repo: "${{ github.event.inputs.mandrel-packaging-repo }}"
-      distribution: "${{ github.event.inputs.distribution }}"
-      build-from-source: "${{ github.event.inputs.build-from-source }}"
-      jdk: "${{ github.event.inputs.jdk }}"
-      builder-image: "${{ github.event.inputs.builder-image }}"
+      quarkus-version: ${{ github.event.inputs.quarkus-version }}
+      quarkus-repo: ${{ github.event.inputs.quarkus-repo }}
+      repo: ${{ github.event.inputs.repo }}
+      version: ${{ github.event.inputs.version }}
+      mandrel-packaging-version: ${{ github.event.inputs.mandrel-packaging-version }}
+      mandrel-packaging-repo: ${{ github.event.inputs.mandrel-packaging-repo }}
+      distribution: ${{ github.event.inputs.distribution }}
+      build-from-source: ${{ fromJson(github.event.inputs.build-from-source) }}
+      jdk: ${{ github.event.inputs.jdk }}
+      builder-image: ${{ github.event.inputs.builder-image }}
