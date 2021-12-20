@@ -1,9 +1,10 @@
+name: Mandrel-Quarkus tests wrapper
+
 # Enable base.yml to be executed as a dispatch workflow with:
 #
 # gh workflow run base-wrapper.yml \
 #  -f quarkus-repo=gsmet/quarkus -f quarkus-version=2.2.4-backports-1 \
 #  -f builder-image="quay.io/quarkus/ubi-quarkus-mandrel:21.3-java11"
-name: Mandrel-Quarkus tests wrapper
 
 on:
   workflow_dispatch:
