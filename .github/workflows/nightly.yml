@@ -12,7 +12,7 @@ on:
       - '.github/workflows/base.yml'
       - '.github/workflows/base-windows.yml'
   schedule:
-  - cron: '0 2 * * *'
+    - cron: '0 2 * * *'
   workflow_dispatch: []
 
 # The following aims to reduce CI CPU cycles by:
@@ -53,21 +53,21 @@ jobs:
       quarkus-version: "main"
       version: "graal/master"
       distribution: "graalvm"
-  q-main-mandrel-latest:
+  q-main-mandrel-17-latest:
     name: "Q main M 17 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
       version: "graal/master"
       jdk: "17/ea"
-  q-main-mandrel-latest-win:
+  q-main-mandrel-17-latest-win:
     name: "Q main M 17 latest windows"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
       version: "graal/master"
       jdk: "17/ea"
-  q-main-graal-latest:
+  q-main-graal-17-latest:
     name: "Q main G 17 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
