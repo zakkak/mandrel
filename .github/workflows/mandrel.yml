@@ -75,16 +75,16 @@ jobs:
       version: "mandrel/21.3"
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
-  q-main-ea:
-    name: "Q main M 21.3 EA"
+  q-main-17-ea:
+    name: "Q main M 17 21.3 EA"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
       version: "mandrel/21.3"
       mandrel-packaging-version: "21.3"
       jdk: "17/ea"
-  q-main-ea-win:
-    name: "Q main M 21.3 windows EA"
+  q-main-17-ea-win:
+    name: "Q main M 17 21.3 windows EA"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
