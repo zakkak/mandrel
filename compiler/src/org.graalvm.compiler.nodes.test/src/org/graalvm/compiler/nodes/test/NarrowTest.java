@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,16 +22,33 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.core.genscavenge;
+package org.graalvm.compiler.nodes.test;
 
-import com.oracle.svm.core.option.HostedOptionKey;
+import org.graalvm.compiler.api.directives.GraalDirectives;
+import org.graalvm.compiler.core.test.GraalCompilerTest;
+import org.junit.Test;
 
-/**
- * Only for compatibility with legacy code, replaced by {@link HeapParameters.Options}.
- */
-public final class HeapPolicyOptions {
-    public static final HostedOptionKey<Long> AlignedHeapChunkSize = HeapParameters.Options.AlignedHeapChunkSize;
+public class NarrowTest extends GraalCompilerTest {
 
-    private HeapPolicyOptions() {
+    @Test
+    public void testSnippet0() {
+        test("snippet0", (char) 0);
+    }
+
+    static boolean snippet0(char c0) {
+        return -2 > (byte) ((byte) c0 / (byte) 2134864769);
+    }
+
+    @Test
+    public void testSnippet1() {
+        test("snippet1", 50400L);
+    }
+
+    static boolean snippet1(long l0) {
+        if ((char) ((byte) l0) >= Character.MAX_VALUE) {
+            return true;
+        }
+        GraalDirectives.blackhole((byte) l0);
+        return false;
     }
 }

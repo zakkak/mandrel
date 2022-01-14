@@ -217,6 +217,8 @@ public abstract class Accessor {
         public abstract void invalidateAfterPreinitialiation(Source source);
 
         public abstract void mergeLoadedSources(Source[] sources);
+
+        public abstract void setEmbedderSource(SourceBuilder builder, boolean b);
     }
 
     public abstract static class InteropSupport extends Support {
@@ -436,7 +438,7 @@ public abstract class Accessor {
 
         public abstract void addToHostClassPath(Object polyglotLanguageContext, TruffleFile entries);
 
-        public abstract boolean isInstrumentExceptionsAreThrown(Object polyglotEngine);
+        public abstract boolean isInstrumentExceptionsAreThrown(Object polyglotInstrument);
 
         public abstract Object asBoxedGuestValue(Object guestObject, Object polyglotLanguageContext);
 
