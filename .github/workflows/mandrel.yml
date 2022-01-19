@@ -32,7 +32,8 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "2.2"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
   q-2_2-ea-win:
@@ -40,7 +41,8 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "2.2"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
   q-main-ea:
@@ -48,7 +50,8 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
   q-main-ea-win:
@@ -56,7 +59,8 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
   q-latest-ea:
@@ -64,7 +68,8 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "latest"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
   q-latest-ea-win:
@@ -72,23 +77,26 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "latest"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "11/ea"
-  q-main-ea:
-    name: "Q main M 21.3 EA"
+  q-main-17-ea:
+    name: "Q main M 17 21.3 EA"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "17/ea"
-  q-main-ea-win:
-    name: "Q main M 21.3 windows EA"
+  q-main-17-ea-win:
+    name: "Q main M 17 21.3 windows EA"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
-      version: "mandrel/21.3"
+      repo: ${{ github.repository }}
+      version: ${{ github.ref }}
       mandrel-packaging-version: "21.3"
       jdk: "17/ea"
   # q-2_2-ga:
@@ -96,7 +104,8 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base.yml@default
   #   with:
   #     quarkus-version: "2.2"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"
   # q-2_2-ga-win:
@@ -104,7 +113,8 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
   #   with:
   #     quarkus-version: "2.2"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"
   # q-main-ga:
@@ -112,7 +122,8 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base.yml@default
   #   with:
   #     quarkus-version: "main"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"
   # q-main-ga-win:
@@ -120,7 +131,8 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
   #   with:
   #     quarkus-version: "main"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"
   # q-latest-ga:
@@ -128,7 +140,8 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base.yml@default
   #   with:
   #     quarkus-version: "latest"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"
   # q-latest-ga-win:
@@ -136,6 +149,7 @@ jobs:
   #   uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
   #   with:
   #     quarkus-version: "latest"
-  #     version: "mandrel/21.3"
+  #     repo: ${{ github.repository }}
+  #     version: ${{ github.ref }}
   #     mandrel-packaging-version: "21.3"
   #     jdk: "11/ga"

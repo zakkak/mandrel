@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,42 +22,19 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.core.genscavenge;
+package com.oracle.svm.core.jdk;
 
-import org.graalvm.compiler.api.replacements.Fold;
-import org.graalvm.word.UnsignedWord;
+import java.util.function.BooleanSupplier;
 
-/**
- * Only for compatibility with legacy code, replaced by {@link CollectionPolicy} and
- * {@link HeapParameters}.
- */
-public final class HeapPolicy {
-    public static UnsignedWord getMaximumHeapSize() {
-        return GCImpl.getPolicy().getMaximumHeapSize();
+import org.graalvm.compiler.serviceprovider.GraalServices;
+import org.graalvm.compiler.serviceprovider.JavaVersionUtil;
+
+public class JDK17_0_2OrLater implements BooleanSupplier {
+
+    @Override
+    public boolean getAsBoolean() {
+        return JavaVersionUtil.JAVA_SPEC > 17 ||
+                        (JavaVersionUtil.JAVA_SPEC == 17 && GraalServices.getJavaUpdateVersion() > 1);
     }
 
-    public static UnsignedWord getMinimumHeapSize() {
-        return GCImpl.getPolicy().getMinimumHeapSize();
-    }
-
-    public static void setMaximumHeapSize(UnsignedWord value) {
-        HeapParameters.setMaximumHeapSize(value);
-    }
-
-    public static void setMinimumHeapSize(UnsignedWord value) {
-        HeapParameters.setMinimumHeapSize(value);
-    }
-
-    @Fold
-    public static UnsignedWord getAlignedHeapChunkSize() {
-        return HeapParameters.getAlignedHeapChunkSize();
-    }
-
-    @Fold
-    public static UnsignedWord getLargeArrayThreshold() {
-        return HeapParameters.getLargeArrayThreshold();
-    }
-
-    private HeapPolicy() {
-    }
 }

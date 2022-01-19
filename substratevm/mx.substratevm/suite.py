@@ -2,7 +2,7 @@
 suite = {
     "mxversion": "5.308.1",
     "name": "substratevm",
-    "version" : "21.3.0.1",
+    "version" : "21.3.1.0",
     "release" : False,
     "url" : "https://github.com/oracle/graal/tree/master/substratevm",
 
@@ -1151,6 +1151,9 @@ suite = {
                         "sun.util.locale.provider",
                         "sun.util.resources",
                         "sun.invoke.util",
+                    ],
+                    "java.management": [
+                        "sun.management",
                     ],
                     "java.xml.crypto": [
                         "org.jcp.xml.dsig.internal.dom",
