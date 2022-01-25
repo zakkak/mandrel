@@ -309,7 +309,8 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
         if (FipsUtil.get().isFipsEnabled()) {
             rci.rerunInitialization(clazz(access, "sun.security.pkcs11.Secmod"), "reinit at runtime for PKCS11 wrapper");
             rci.rerunInitialization(clazz(access, "sun.security.pkcs11.SunPKCS11"), "reinit at runtime for PKCS11");
-            rci.rerunInitialization(clazz(access, "sun.security.pkcs11.FIPSKeyImporter"), "reinit at runtime for PKCS11");
+            // FIPSKeyImporter is JDK 11 only for now. See RHBZ#2006366
+            optionalClazz(access, "sun.security.pkcs11.FIPSKeyImporter").ifPresent(c -> rci.rerunInitialization(c, "reinit at runtime for PKCS11"));
             rci.rerunInitialization(clazz(access, "sun.security.pkcs11.wrapper.PKCS11"), "for initializing native lib (nss) at runtime");
         }
     }
@@ -331,7 +332,7 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
             /* Ensure native calls to sun_security_ec* will be resolved as builtIn. */
             PlatformNativeLibrarySupport.singleton().addBuiltinPkgNativePrefix("sun_security_ec");
         }
-        if (JavaVersionUtil.JAVA_SPEC < 13 && FipsUtil.get().isFipsEnabled()) {
+        if (JavaVersionUtil.JAVA_SPEC >= 11 && FipsUtil.get().isFipsEnabled()) {
             // https://bugs.openjdk.java.net/browse/JDK-8217835
 
             /*
