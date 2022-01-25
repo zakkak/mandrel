@@ -393,24 +393,32 @@ final class Target_javax_crypto_JceSecurity {
  * in JDK-8217835. Going forward it is recommended to configure FIPS 140 compliant cryptography
  * providers by using the usual JCA providers configuration mechanism.
  */
-@TargetClass(className = "sun.security.ssl.SunJSSE", onlyWith = {JDK11OrEarlier.class})
+@TargetClass(className = "sun.security.ssl.SunJSSE", onlyWith = {JDK11OrLater.class, FipsEnabled.class})
 @SuppressWarnings({"unused"})
 final class Target_sun_security_ssl_SunJSSE {
     @Alias //
-    @TargetElement(onlyWith = FipsEnabled.class) //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrEarlier.class}) //
     @RecomputeFieldValue(kind = Kind.Reset) //
     static Provider cryptoProvider;
 
     @Alias //
-    @TargetElement(onlyWith = FipsEnabled.class) //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrEarlier.class}) //
     @RecomputeFieldValue(kind = Kind.Reset) //
     static Boolean fips;
 
     @Substitute
-    @TargetElement(onlyWith = FipsDisabled.class)
+    @TargetElement(onlyWith = {FipsDisabled.class, JDK11OrEarlier.class})
     private Target_sun_security_ssl_SunJSSE(java.security.Provider cryptoProvider, String providerName) {
         throw VMError.unsupportedFeature("Experimental FIPS mode in the SunJSSE Provider is deprecated (JDK-8217835)." +
                         " To register a FIPS provider use the supported java.security.Security.addProvider() API.");
+    }
+
+    @Alias
+    @TargetElement(name = TargetElement.CONSTRUCTOR_NAME)
+    native void originalConstructor();
+
+    public Target_sun_security_ssl_SunJSSE() {
+        originalConstructor();
     }
 }
 
@@ -628,10 +636,6 @@ final class Target_sun_security_provider_PolicySpiFile {
 final class Target_sun_security_provider_PolicyFile {
 }
 
-@TargetClass(className = "sun.security.pkcs11.wrapper.PKCS11", onlyWith = {JDK11OrLater.class, FipsEnabled.class})
-final class Target_sun_security_pkcs11_wrapper_PKCS11 {
-}
-
 @TargetClass(className = "sun.security.pkcs11.SunPKCS11", onlyWith = {JDK11OrLater.class, FipsDisabled.class})
 @SuppressWarnings({"unused"})
 final class Target_sun_security_pkcs11_SunPKCS11_NON_FIPS {
@@ -639,54 +643,6 @@ final class Target_sun_security_pkcs11_SunPKCS11_NON_FIPS {
     @Alias
     public Target_sun_security_pkcs11_SunPKCS11_NON_FIPS() {
         throw VMError.unsupportedFeature("sun.security.pkcs11.SunPKCS11 is not supported in non-FIPS mode!");
-    }
-}
-
-@TargetClass(className = "sun.security.pkcs11.SunPKCS11", onlyWith = {JDK11OrLater.class, FipsEnabled.class})
-@SuppressWarnings({"unused"})
-final class Target_sun_security_pkcs11_SunPKCS11_FIPS {
-
-    @Alias //
-    @RecomputeFieldValue(kind = Kind.Reset) //
-    Target_sun_security_pkcs11_wrapper_PKCS11 p11;
-
-    @Alias //
-    @TargetElement(name = TargetElement.CONSTRUCTOR_NAME)
-    native void originalConstructor();
-
-    @Alias //
-    public Target_sun_security_pkcs11_SunPKCS11_FIPS() {
-        originalConstructor();
-    }
-
-    @Alias //
-    public native Provider configure(String c);
-}
-
-@TargetClass(className = "sun.security.pkcs11.Token", onlyWith = {JDK11OrLater.class, FipsEnabled.class})
-@SuppressWarnings({"unused"})
-final class Target_sun_security_pkcs11_Token {
-
-    @Alias//
-    @RecomputeFieldValue(kind = Kind.Reset) //
-    Target_sun_security_pkcs11_SunPKCS11_FIPS provider;
-
-    @Alias //
-    @RecomputeFieldValue(kind = Kind.Reset) //
-    Target_sun_security_pkcs11_wrapper_PKCS11 p11;
-
-}
-
-final class NssConfigRetriever {
-
-    static String getInlineConfig() {
-        String file = "/" + NssConfig.CONFIG_FILE_NAME;
-        try (InputStream in = SunPKCS11ProviderAccessors.class.getResourceAsStream(file);
-                        BufferedReader bufIn = new BufferedReader(new InputStreamReader(in))) {
-            return "--" + bufIn.lines().collect(Collectors.joining("\n"));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to retrieve " + file + " from image heap");
-        }
     }
 }
 
@@ -786,16 +742,13 @@ class SunPKCS11ProviderAccessors {
          * allowed. This means that for providers not handled here they will fail to load should the
          * FIPS set of supported providers increase in future.
          */
+        JSSEProviderSupport providerSupport = JSSEProviderSupport.singleton();
         if (obj.provName.equals(NssConfig.SunPKCS_NSS_FIPS_NAME)) {
-            obj.injectedProvider = SunPKCS11Holder.getInstance();
+            obj.injectedProvider = providerSupport.getSunPKCSProvider();
         } else if (obj.provName.contains("SunEC")) {
             obj.injectedProvider = new sun.security.ec.SunEC();
         } else if (obj.provName.equals("SunJSSE") || obj.provName.equals("com.sun.net.ssl.internal.ssl.Provider")) {
-            /*
-             * SunJSSE provider in FIPS mode.
-             */
-            Provider p = SunPKCS11Holder.getInstance();
-            obj.injectedProvider = new com.sun.net.ssl.internal.ssl.Provider(p);
+            obj.injectedProvider = providerSupport.getFipsJSSEProvider();
         } else {
             obj.injectedProvider = obj.getProvider();
         }
@@ -805,31 +758,6 @@ class SunPKCS11ProviderAccessors {
          * entering the synchronized slow path again.
          */
         obj.needsReinitialization = NeedsReinitializationProvider.STATUS_REINITIALIZED;
-    }
-}
-
-/**
- * Holder for code being run at image runtime. Holds the SunPKCS provider instance.
- */
-final class SunPKCS11Holder {
-    private static volatile Provider INSTANCE;
-
-    static Provider getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = createOnce();
-        }
-        return INSTANCE;
-    }
-
-    private static synchronized Provider createOnce() {
-        if (INSTANCE == null) {
-            String config = NssConfigRetriever.getInlineConfig();
-            Target_sun_security_pkcs11_SunPKCS11_FIPS sunPKCS11 = new Target_sun_security_pkcs11_SunPKCS11_FIPS();
-            // SunPKCS11's configure() method calls constructor SunPKCS11(Config), which performs
-            // initialization of Secmod
-            INSTANCE = sunPKCS11.configure(config);
-        }
-        return INSTANCE;
     }
 }
 
