@@ -278,7 +278,11 @@ suite = {
                     "jdk.internal.loader",
                     "jdk.internal.misc",
                     "jdk.internal.platform",
+                    "jdk.internal.access",
                     "sun.invoke.util",
+                ],
+                "jdk.crypto.ec" : [
+                    "sun.security.ec",
                 ],
             },
             "javaCompliance": "17+",

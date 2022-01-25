@@ -331,7 +331,7 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
             /* Ensure native calls to sun_security_ec* will be resolved as builtIn. */
             PlatformNativeLibrarySupport.singleton().addBuiltinPkgNativePrefix("sun_security_ec");
         }
-        if (JavaVersionUtil.JAVA_SPEC < 13 && FipsUtil.get().isFipsEnabled()) {
+        if (JavaVersionUtil.JAVA_SPEC >= 11 && FipsUtil.get().isFipsEnabled()) {
             // https://bugs.openjdk.java.net/browse/JDK-8217835
 
             /*
