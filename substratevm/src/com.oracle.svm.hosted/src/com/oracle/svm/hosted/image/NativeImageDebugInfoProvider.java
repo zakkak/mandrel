@@ -1001,7 +1001,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
      */
     private class NativeImageDebugLineInfo implements DebugLineInfo {
         private final int bci;
-        private final ResolvedJavaMethod method;
+        private final HostedMethod hostedMethod;
         private final int lo;
         private final int hi;
         private Path cachePath;
@@ -1018,7 +1018,10 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         NativeImageDebugLineInfo(NodeSourcePosition position, int lo, int hi) {
             this.bci = position.getBCI();
-            this.method = position.getMethod();
+            assert position.getMethod() instanceof HostedMethod;
+            HostedMethod hostedMethod = heap.getUniverse().lookup(position.getMethod());
+            assert hostedMethod != null;
+            this.hostedMethod = hostedMethod;
             this.lo = lo;
             this.hi = hi;
             this.cachePath = SubstrateOptions.getDebugInfoSourceCacheRoot();
@@ -1061,15 +1064,12 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public ResolvedJavaType ownerType() {
-            if (method instanceof HostedMethod) {
-                return getDeclaringClass((HostedMethod) method, true);
-            }
-            return method.getDeclaringClass();
+            return getDeclaringClass(hostedMethod, true);
         }
 
         @Override
         public String name() {
-            ResolvedJavaMethod targetMethod = method;
+            ResolvedJavaMethod targetMethod = hostedMethod;
             while (targetMethod instanceof WrappedJavaMethod) {
                 targetMethod = ((WrappedJavaMethod) targetMethod).getWrapped();
             }
@@ -1080,19 +1080,12 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             }
             String name = targetMethod.getName();
             if (name.equals("<init>")) {
-                if (method instanceof HostedMethod) {
-                    name = getDeclaringClass((HostedMethod) method, true).toJavaName();
-                    if (name.indexOf('.') >= 0) {
-                        name = name.substring(name.lastIndexOf('.') + 1);
-                    }
-                    if (name.indexOf('$') >= 0) {
-                        name = name.substring(name.lastIndexOf('$') + 1);
-                    }
-                } else {
-                    name = targetMethod.format("%h");
-                    if (name.indexOf('$') >= 0) {
-                        name = name.substring(name.lastIndexOf('$') + 1);
-                    }
+                name = getDeclaringClass(hostedMethod, true).toJavaName();
+                if (name.indexOf('.') >= 0) {
+                    name = name.substring(name.lastIndexOf('.') + 1);
+                }
+                if (name.indexOf('$') >= 0) {
+                    name = name.substring(name.lastIndexOf('$') + 1);
                 }
             }
             return name;
@@ -1100,20 +1093,17 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public String valueType() {
-            return method.format("%R");
+            return hostedMethod.format("%R");
         }
 
         @Override
         public String symbolNameForMethod() {
-            return NativeImage.localSymbolNameForMethod(method);
+            return NativeImage.localSymbolNameForMethod(hostedMethod);
         }
 
         @Override
         public boolean isDeoptTarget() {
-            if (method instanceof HostedMethod) {
-                return ((HostedMethod) method).isDeoptTarget();
-            }
-            return name().endsWith(HostedMethod.METHOD_NAME_DEOPT_SUFFIX);
+            return hostedMethod.isDeoptTarget();
         }
 
         @Override
@@ -1128,7 +1118,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public int line() {
-            LineNumberTable lineNumberTable = method.getLineNumberTable();
+            LineNumberTable lineNumberTable = hostedMethod.getLineNumberTable();
             if (lineNumberTable != null && bci >= 0) {
                 return lineNumberTable.getLineNumber(bci);
             }
@@ -1137,7 +1127,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public List<String> paramTypes() {
-            Signature signature = method.getSignature();
+            Signature signature = hostedMethod.getSignature();
             int parameterCount = signature.getParameterCount(false);
             List<String> paramTypes = new ArrayList<>(parameterCount);
             for (int i = 0; i < parameterCount; i++) {
@@ -1150,7 +1140,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         @Override
         public List<String> paramNames() {
             /* Can only provide blank names for now. */
-            Signature signature = method.getSignature();
+            Signature signature = hostedMethod.getSignature();
             int parameterCount = signature.getParameterCount(false);
             List<String> paramNames = new ArrayList<>(parameterCount);
             for (int i = 0; i < parameterCount; i++) {
@@ -1161,7 +1151,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public int modifiers() {
-            return method.getModifiers();
+            return hostedMethod.getModifiers();
         }
 
         @Override
@@ -1172,12 +1162,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         @SuppressWarnings("try")
         private void computeFullFilePath() {
             ResolvedJavaType declaringClass;
-            // if we have a HostedMethod then deal with substitutions
-            if (method instanceof HostedMethod) {
-                declaringClass = getDeclaringClass((HostedMethod) method, false);
-            } else {
-                declaringClass = method.getDeclaringClass();
-            }
+            declaringClass = getDeclaringClass(hostedMethod, false);
             Class<?> clazz = null;
             if (declaringClass instanceof OriginalClassProvider) {
                 clazz = ((OriginalClassProvider) declaringClass).getJavaClass();
