@@ -245,6 +245,25 @@ final class Target_javax_crypto_CryptoAllPermission {
     static Target_javax_crypto_CryptoAllPermission INSTANCE;
 }
 
+@TargetClass(value = java.security.Provider.Service.class)
+final class Target_java_security_Provider_Service {
+    @Alias //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrLater.class}) //
+    @RecomputeFieldValue(kind = Kind.Custom, declClass = SecurityProviderTransformer.class, disableCaching = true) //
+    private Provider provider;
+
+    private static class SecurityProviderTransformer implements RecomputeFieldValue.CustomFieldValueTransformer {
+        @Override
+        public Object transform(MetaAccessProvider metaAccess, ResolvedJavaField original, ResolvedJavaField annotated, Object receiver, Object originalValue) {
+            Provider originalProv = (Provider) originalValue;
+            if (NssConfig.SunPKCS_NSS_FIPS_NAME.equals(originalProv.getName())) {
+                return null;
+            }
+            return originalValue;
+        }
+    }
+}
+
 @Platforms(Platform.WINDOWS.class)
 @TargetClass(value = java.security.Provider.class)
 final class Target_java_security_Provider {
