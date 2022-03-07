@@ -243,6 +243,25 @@ final class Target_java_security_Provider_ServiceKey {
 
 }
 
+@TargetClass(value = java.security.Provider.Service.class)
+final class Target_java_security_Provider_Service {
+    @Alias //
+    @TargetElement(onlyWith = {FipsEnabled.class, JDK11OrLater.class}) //
+    @RecomputeFieldValue(kind = Kind.Custom, declClass = SecurityProviderTransformer.class, disableCaching = true) //
+    private Provider provider;
+
+    private static class SecurityProviderTransformer implements FieldValueTransformer {
+        @Override
+        public Object transform(Object receiver, Object originalValue) {
+            Provider originalProv = (Provider) originalValue;
+            if (NssConfig.SunPKCS_NSS_FIPS_NAME.equals(originalProv.getName())) {
+                return null;
+            }
+            return originalValue;
+        }
+    }
+}
+
 @TargetClass(value = java.security.Provider.class)
 final class Target_java_security_Provider {
     @Alias @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.Custom, declClass = ServiceKeyComputer.class) //
