@@ -195,12 +195,6 @@ public final class Target_java_lang_ClassLoader {
     }
 
     @Substitute //
-    @SuppressWarnings({"unused"})
-    Object getClassLoadingLock(String className) {
-        throw VMError.unsupportedFeature("Target_java_lang_ClassLoader.getClassLoadingLock(String)");
-    }
-
-    @Substitute //
     @SuppressWarnings({"unused"}) //
     private Class<?> findLoadedClass0(String name) {
         if (name == null) {
@@ -345,8 +339,12 @@ final class Target_java_lang_ClassLoader_NativeLibrary {
      */
 
     @Delete
-    @TargetElement(onlyWith = JDK8OrEarlier.class)
+    @TargetElement(onlyWith = LoadWith2Args.class)
     private native void load(String name, boolean isBuiltin);
+
+    @Delete
+    @TargetElement(onlyWith = LoadWith3Args.class)
+    private native void load(String name, boolean isBuiltin, boolean throwExceptionIfFail);
 
     @Delete
     @TargetElement(onlyWith = JDK8OrEarlier.class)
@@ -357,8 +355,12 @@ final class Target_java_lang_ClassLoader_NativeLibrary {
     private native void unload(String name, boolean isBuiltin);
 
     @Delete
-    @TargetElement(onlyWith = JDK11OrLater.class)
+    @TargetElement(onlyWith = Load0With2Args.class)
     private native boolean load0(String name, boolean isBuiltin);
+
+    @Delete
+    @TargetElement(onlyWith = Load0With3Args.class)
+    private native boolean load0(String name, boolean isBuiltin, boolean throwExceptionIfFail);
 
     @Delete
     @TargetElement(onlyWith = JDK11OrLater.class)

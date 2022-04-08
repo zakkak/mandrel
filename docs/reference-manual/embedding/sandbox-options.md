@@ -1,3 +1,9 @@
+---
+layout: docs
+toc_group: embedding
+link_title: Enterprise Sandbox Resource Limits
+permalink: /reference-manual/embed-languages/sandbox-resource-limits/
+---
 ## Enterprise Sandbox Resource Limits
 
 The 20.3 release of GraalVM introduced the experimental Sandbox Resource Limits feature that allows for the limiting of resources used by guest applications.
@@ -143,7 +149,7 @@ If used together with the AST depth limit it can be used to estimate total stack
 ## Limiting the number of active threads
 
 Limits the number of threads that can be used by a context at the same point in time.
-By default, an arbitary number of threads can be used.
+By default, an arbitrary number of threads can be used.
 If a set limit is exceeded, entering the context fails with a PolyglotException and the polyglot context is canceled.
 Resetting resource limits does not affect thread limits.
 
