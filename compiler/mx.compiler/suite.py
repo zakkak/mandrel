@@ -4,7 +4,7 @@ suite = {
   "sourceinprojectwhitelist" : [],
 
   "groupId" : "org.graalvm.compiler",
-  "version" : "21.3.1.2",
+  "version" : "21.3.2.0",
   "release" : False,
   "url" : "http://www.graalvm.org/",
   "developer" : {
@@ -503,6 +503,9 @@ suite = {
     "org.graalvm.compiler.api.directives" : {
       "subDir" : "src",
       "sourceDirs" : ["src"],
+      "dependencies" : [
+        "JVMCI_API",
+      ],
       "checkstyle" : "org.graalvm.compiler.graph",
       "javaCompliance" : "8+",
       "workingSets" : "API,Graal",
@@ -1567,6 +1570,11 @@ suite = {
       "requiresConcealed" : {
         "jdk.internal.vm.ci" : [
           "jdk.vm.ci.meta",
+          "jdk.vm.ci.code",
+        ],
+        "java.base" : [
+          "jdk.internal.misc",
+          "jdk.internal.vm.annotation",
         ],
       },
       "checkstyle" : "org.graalvm.compiler.graph",

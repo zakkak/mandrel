@@ -1032,7 +1032,7 @@ public final class DynamicHub implements JavaKind.FormatWithToString, AnnotatedE
         public static ReflectionData get(Field[] declaredFields, Field[] publicFields, Field[] publicUnhiddenFields, Method[] declaredMethods, Method[] publicMethods,
                         Constructor<?>[] declaredConstructors, Constructor<?>[] publicConstructors, Constructor<?> nullaryConstructor, Field[] declaredPublicFields,
                         Method[] declaredPublicMethods, Class<?>[] declaredClasses, Class<?>[] publicClasses, Executable enclosingMethodOrConstructor, Object[] recordComponents,
-			Map<String, Annotation[]> recordAnnotations, Map<String, AnnotatedType> recordAnnotatedType) {
+                        Map<String, Annotation[]> recordAnnotations, Map<String, AnnotatedType> recordAnnotatedType) {
 
             if (z(declaredFields) && z(publicFields) && z(publicUnhiddenFields) && z(declaredMethods) && z(publicMethods) && z(declaredConstructors) &&
                             z(publicConstructors) && nullaryConstructor == null && z(declaredPublicFields) && z(declaredPublicMethods) && z(declaredClasses) &&
@@ -1041,8 +1041,7 @@ public final class DynamicHub implements JavaKind.FormatWithToString, AnnotatedE
                 return EMPTY; // avoid redundant objects in image heap
             }
             return new ReflectionData(declaredFields, publicFields, publicUnhiddenFields, declaredMethods, publicMethods, declaredConstructors, publicConstructors, nullaryConstructor,
-                            declaredPublicFields, declaredPublicMethods, declaredClasses, publicClasses, enclosingMethodOrConstructor, recordComponents, recordAnnotations,
-			    recordAnnotatedType);
+                            declaredPublicFields, declaredPublicMethods, declaredClasses, publicClasses, enclosingMethodOrConstructor, recordComponents, recordAnnotations, recordAnnotatedType);
         }
 
         private static boolean z(Object[] array) { // for better readability above
@@ -1077,8 +1076,8 @@ public final class DynamicHub implements JavaKind.FormatWithToString, AnnotatedE
 
         ReflectionData(Field[] declaredFields, Field[] publicFields, Field[] publicUnhiddenFields, Method[] declaredMethods, Method[] publicMethods, Constructor<?>[] declaredConstructors,
                         Constructor<?>[] publicConstructors, Constructor<?> nullaryConstructor, Field[] declaredPublicFields, Method[] declaredPublicMethods, Class<?>[] declaredClasses,
-                        Class<?>[] publicClasses, Executable enclosingMethodOrConstructor,
-                        Object[] recordComponents, Map<String, Annotation[]> recordAnnotations, Map<String, AnnotatedType> recordAnnotatedType) {
+                        Class<?>[] publicClasses, Executable enclosingMethodOrConstructor, Object[] recordComponents, Map<String, Annotation[]> recordAnnotations,
+                        Map<String, AnnotatedType> recordAnnotatedType) {
             this.declaredFields = declaredFields;
             this.publicFields = publicFields;
             this.publicUnhiddenFields = publicUnhiddenFields;
