@@ -497,7 +497,8 @@ class JceSecurityAccessor {
 final class JceSecurityUtil {
 
     static Object providerKey(Provider p) {
-        if (JavaVersionUtil.JAVA_SPEC <= 11) {
+        // For FIPS and JDK 11 we use the provider as key
+        if (JavaVersionUtil.JAVA_SPEC <= 11 || NssConfig.IS_FIPS) {
             return p;
         }
         /* Starting with JDK 17 the verification results map key is an identity wrapper object. */
