@@ -745,10 +745,10 @@ class SunPKCS11ProviderAccessors {
         obj.needsReinitialization = NeedsReinitializationProvider.STATUS_IN_REINITIALIZATION;
 
         /*
-         * FIPS mode only supports these 4 providers: 1. Name: SunPKCS11-NSS-FIPS class:
-         * sun.security.pkcs11.SunPKCS11 2. Name: SUN class: sun.security.provider.Sun 3. Name:
-         * SunEC class: sun.security.ec.SunEC 4. Name: SunJSSE class:
-         * com.sun.net.ssl.internal.ssl.Provider
+         * FIPS mode needs to support the SunPKCS11 provider with its NSS linkage
+         * (SunPKCS11-NSS-FIPS). As a corollary, the SunJSSE provider needs to be initialized in
+         * FIPS mode as well. Both are handled here and created at image runtime so as to have
+         * proper runtime linkage to nss libraries.
          *
          * We need to runtime-initialize them as they are retrieved via the ProviderConfig API at
          * image build time. We no longer have access to the build-time-inited ProviderConfigs as
@@ -756,10 +756,9 @@ class SunPKCS11ProviderAccessors {
          * config. Thus, we need to hand-craft-initialization here so they become properly set up so
          * they can be used at image run time.
          *
-         * Note that delegation to ProviderConfig.getProvider() only works for a restrict set as
-         * doLoadProvider() is substituted above as provider loading at image runtime is not
-         * allowed. This means that for providers not handled here they will fail to load should the
-         * FIPS set of supported providers increase in future.
+         * Note that we delegate to ProviderConfig.getProvider() which will give us access to
+         * built-time initialized providers (and which don't need to be created at runtime). This is
+         * the same as they would normally work outside the FIPS config.
          */
         JSSEProviderSupport providerSupport = JSSEProviderSupport.singleton();
         if (obj.provName.equals(NssConfig.SunPKCS_NSS_FIPS_NAME)) {
