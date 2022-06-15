@@ -48,6 +48,7 @@ import java.security.SecureRandom;
 import java.security.Security;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -484,7 +485,8 @@ class JceSecurityAccessor {
 final class JceSecurityUtil {
 
     static Object providerKey(Provider p) {
-        if (JavaVersionUtil.JAVA_SPEC < 16) {
+        // For FIPS and JDK 11 we use the provider as key
+        if (JavaVersionUtil.JAVA_SPEC < 16 || NssConfig.IS_FIPS) {
             return p;
         }
         /*

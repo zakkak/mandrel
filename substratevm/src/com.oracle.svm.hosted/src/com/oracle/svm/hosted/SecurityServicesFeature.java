@@ -957,14 +957,46 @@ public class SecurityServicesFeature extends JNIRegistrationUtil implements Feat
             }
         };
 
-        return obj -> {
-            Map<Object, Object> original = (Map<Object, Object>) obj;
-            Map<Object, Object> verificationResults = new ConcurrentHashMap<>(original);
+        /*
+         * In FIPS mode we cannot rely on instance equality for Provider instances between image
+         * build and runtime. That is because we need to inject accessors into ProviderConfig since
+         * the build time instance of SunPKCS11 wouldn't be allowed in the image heap as it needs to
+         * get runtime re-initialized. Therefore, the Provider instances returned at image runtime
+         * won't match the build-time Providers anymore and the verification map uses reference
+         * equality in its IdentityWrapper class.
+         *
+         * Instead use a map with the Provider as key. This still ensures that only build-time
+         * available Providers will be available at image runtime, yet it doesn't suffer the problem
+         * of requiring reference equality for the map-lookup that uses IdentityWrapper as keys.
+         */
+        if (FipsUtil.get().isFipsEnabled()) {
+            return obj -> {
+                Map<Object, Object> original = (Map<Object, Object>) obj;
+                Map<Object, Object> temporaryMap = new HashMap<>(original);
 
-            verificationResults.keySet().removeIf(listRemovalPredicate);
+                temporaryMap.keySet().removeIf(listRemovalPredicate);
+                Map<Object, Object> verificationResults = new ConcurrentHashMap<>(temporaryMap.size());
+                for (Object idWrapper : temporaryMap.keySet()) {
+                    try {
+                        Provider p = (Provider) providerField.get(idWrapper);
+                        verificationResults.put(p, temporaryMap.get(idWrapper));
+                    } catch (IllegalAccessException e) {
+                        throw VMError.shouldNotReachHere(e);
+                    }
+                }
 
-            return verificationResults;
-        };
+                return verificationResults;
+            };
+        } else {
+            return obj -> {
+                Map<Object, Object> original = (Map<Object, Object>) obj;
+                Map<Object, Object> verificationResults = new ConcurrentHashMap<>(original);
+
+                verificationResults.keySet().removeIf(listRemovalPredicate);
+
+                return verificationResults;
+            };
+        }
 
     }
 
