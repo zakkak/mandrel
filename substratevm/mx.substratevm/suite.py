@@ -683,6 +683,7 @@ suite = {
                 "mx:JUNIT_TOOL",
                 "sdk:GRAAL_SDK",
                 "SVM",
+                "TEST_MODULE",
             ],
             "requires": [
                 "java.compiler",
@@ -720,6 +721,15 @@ suite = {
             "javaCompliance": "17+",
             "spotbugs": "false",
             "testProject": True,
+        },
+
+        "com.oracle.svm.test.module": {
+            "subDir": "src",
+            "sourceDirs": ["src"],
+            "checkstyle": "com.oracle.svm.test",
+            "workingSets": "SVM",
+            "javaCompliance": "11+",
+            "spotbugs": "false",
         },
 
         "com.oracle.svm.configure.test": {
@@ -1275,6 +1285,22 @@ suite = {
             },
         },
 
+        "TEST_MODULE": {
+            "subDir": "src",
+            "description" : "Test module for SubstrateVM unit tests",
+            "dependencies": [
+                "com.oracle.svm.test.module",
+            ],
+            "workingSets": "SVM",
+            "annotationProcessors": [],
+            "spotbugs": "false",
+            "moduleInfo" : {
+                "name" : "org.graalvm.nativeimage.testmodule",
+                "exports" : [ "com.oracle.svm.test.module" ],
+            },
+            "testDistribution" : True,
+        },
+
         "JUNIT_SUPPORT": {
             "subDir": "src",
             "description" : "SubstrateVM suppoprt for building JUnit test into image",
@@ -1553,6 +1579,7 @@ suite = {
             "sdk:GRAAL_SDK",
             "SVM",
             "SVM_CONFIGURE",
+            "TEST_MODULE",
           ],
           "testDistribution" : True,
         },

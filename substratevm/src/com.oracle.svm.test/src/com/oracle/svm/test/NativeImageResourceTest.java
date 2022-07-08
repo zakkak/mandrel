@@ -33,6 +33,7 @@ import static com.oracle.svm.test.NativeImageResourceUtils.resourceNameToURL;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Enumeration;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -111,5 +112,24 @@ public class NativeImageResourceTest {
         String nonCanonicalResourceDirectoryName = RESOURCE_DIR + "/./";
         URL url3 = resourceNameToURL(nonCanonicalResourceDirectoryName, false);
         Assert.assertNull("Resource " + nonCanonicalResourceDirectoryName + " is found!", url3);
+    }
+
+    @Test
+    public void classLoaderGetResources() {
+        ClassLoader classLoader = NativeImageResourceUtils.class.getClassLoader();
+        try {
+            System.out.println("HELLO");
+            Enumeration<URL> resources = classLoader.getResources(RESOURCE_FILE_2.substring(1));
+            while (resources.hasMoreElements()) {
+                System.out.println(resources.nextElement());
+            }
+            System.out.println("BYE");
+            resources = ClassLoader.getSystemClassLoader().getResources(RESOURCE_FILE_2.substring(1));
+            while (resources.hasMoreElements()) {
+                System.out.println(resources.nextElement());
+            }
+        } catch (IOException e) {
+            Assert.fail(e.getMessage());
+        }
     }
 }
