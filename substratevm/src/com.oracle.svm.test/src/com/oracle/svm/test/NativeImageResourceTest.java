@@ -73,7 +73,7 @@ public class NativeImageResourceTest {
      * <p>
      * <b>Description: </b> Test inspired by issues: </br>
      * <ol>
-     * <li><a href="https://github.com/oracle/graal/issues/4326">1349</a></li>
+     * <li><a href="https://github.com/oracle/graal/issues/4326">4326</a></li>
      * </ol>
      * </p>
      */
@@ -95,7 +95,7 @@ public class NativeImageResourceTest {
      * <p>
      * <b>Description: </b> Test inspired by issues: </br>
      * <ol>
-     * <li><a href="https://github.com/oracle/graal/issues/4326">1349</a></li>
+     * <li><a href="https://github.com/oracle/graal/issues/4326">4326</a></li>
      * </ol>
      * </p>
      */
@@ -109,6 +109,7 @@ public class NativeImageResourceTest {
         Assert.assertTrue("Two URLs must be the same!", compareTwoURLs(url1, url2));
 
         String nonCanonicalResourceDirectoryName = RESOURCE_DIR + "/./";
-        resourceNameToURL(nonCanonicalResourceDirectoryName, false);
+        URL url3 = resourceNameToURL(nonCanonicalResourceDirectoryName, false);
+        Assert.assertNull("Resource " + nonCanonicalResourceDirectoryName + " is found!", url3);
     }
 }

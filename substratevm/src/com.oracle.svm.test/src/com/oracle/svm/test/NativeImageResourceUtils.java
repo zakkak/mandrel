@@ -113,7 +113,7 @@ public class NativeImageResourceUtils {
                 return nextByte1 == -1 && nextByte2 == -1;
             }
         } catch (IOException e) {
-            Assert.fail("Exception occurs during URL operations!");
+            Assert.fail("Exception occurs during URL operations!\n" + e.getMessage());
         }
         return false;
     }
