@@ -20,10 +20,6 @@ on:
         type: string
         description: 'The Mandrel/Graal repository to be used'
         default: 'graalvm/mandrel'
-      distribution:
-        type: string
-        description: 'Distribution to build, mandrel or graalvm'
-        default: "mandrel"
       mandrel-packaging-version:
         type: string
         description: 'Mandrel packaging version to test (branch, tag, or commit)'
@@ -32,10 +28,10 @@ on:
         type: string
         description: 'Mandrel packaging repository to be used'
         default: "graalvm/mandrel-packaging"
-      build-from-source:
-        type: boolean
-        description: 'Build Mandrel from source instead of grabing a release'
-        default: true
+      build-type:
+        type: string
+        description: 'Build distribution (Mandrel/GraalVM) from source or grab a release'
+        default: "mandrel-source"
       jdk:
         type: string
         description: 'OpenJDK to use. One of 11/ga, 11/ea, 17/ga, 17/ea (/ga and /ea suffixes are only relevant when building from source)'
@@ -80,6 +76,47 @@ env:
   MAVEN_OPTS: -Xmx2g -XX:MaxMetaspaceSize=1g
 
 jobs:
+  build-vars:
+    name: Set distribution and build-from-source variables based on build-type
+    runs-on: ubuntu-latest
+    outputs:
+      build-from-source: ${{ steps.source-build.outputs.build-from-source }}
+      distribution: ${{ steps.distro.outputs.distribution }}
+    steps:
+    - name: Set build-from-source output
+      id: source-build
+      run: |
+        echo "${{ inputs.build-type }}"
+        bfs_token=$(echo ${{ inputs.build-type }} | cut -d'-' -f2)
+        if [ "${bfs_token}" == "release" ]
+        then
+          source_build=false
+        elif [ "${bfs_token}" == "source" ]
+        then
+          source_build=true
+        else
+          echo "Unexpected input 'build-type' = ${{ inputs.build-type }}"
+          exit 1
+        fi
+        echo "source_build=$source_build"
+        echo "::set-output name=build-from-source::$source_build"
+    - name: Set distribution output
+      id: distro
+      run: |
+        bfs_token=$(echo ${{ inputs.build-type }} | cut -d'-' -f1)
+        if [ "${bfs_token}" == "graal" ]
+        then
+          distro="graalvm"
+        elif [ "${bfs_token}" == "mandrel" ]
+        then
+          distro="mandrel"
+        else
+          echo "Unexpected input 'build-type' = ${{ inputs.build-type }}"
+          exit 1
+        fi
+        echo "distro=$distro"
+        echo "::set-output name=distribution::$distro"
+
   get-test-matrix:
     name: Get test matrix
     runs-on: ubuntu-latest
@@ -121,9 +158,10 @@ jobs:
     runs-on: windows-2019
     needs:
       - get-test-matrix
+      - build-vars
     steps:
     - uses: actions/checkout@v2
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       with:
         repository: ${{ inputs.repo }}
         fetch-depth: 1
@@ -134,26 +172,26 @@ jobs:
       with:
         python-version: '3.8'
     - name: Checkout MX
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       run: |
         VERSION=$(find ${MANDREL_REPO} -name "suite.py" -exec grep mxversion {} + | cut -d '"' -f 4 | sort --unique --reverse | head -n 1)
         git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} mx
         ./mx/mx --version
       shell: bash
     - uses: actions/checkout@v2
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       with:
         repository: ${{ inputs.mandrel-packaging-repo }}
         ref: ${{ inputs.mandrel-packaging-version }}
         path: ${{ env.MANDREL_PACKAGING_REPO }}
     - uses: actions/cache@v2.1.5
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       with:
         path: ~/.mx
         key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
         restore-keys: ${{ runner.os }}-mx-
     - name: Get OpenJDK with static libs
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       run: |
         $wc = New-Object System.Net.WebClient
         $wc.DownloadFile("https://api.adoptium.net/v3/binary/latest/${{ inputs.jdk }}/windows/x64/jdk/hotspot/normal/eclipse", "$Env:temp\jdk.zip")
@@ -165,7 +203,7 @@ jobs:
         Remove-Item -Recurse "$Env:temp\jdk-*"
         & $Env:JAVA_HOME\bin\java -version
     - name: Build Mandrel
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       run: |
         cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
         Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
@@ -181,11 +219,11 @@ jobs:
         Remove-Item -Recurse $Env:JAVA_HOME
         Move-Item -Path $Env:MANDREL_HOME -Destination $Env:JAVA_HOME
     - name: Archive JDK
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       shell: bash
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel build
-      if: inputs.build-from-source == true && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       uses: actions/upload-artifact@v2
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
@@ -196,9 +234,10 @@ jobs:
     runs-on: windows-2019
     needs:
       - get-test-matrix
+      - build-vars
     steps:
     - uses: actions/checkout@v2
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       with:
         repository: ${{ inputs.repo }}
         fetch-depth: 1
@@ -209,20 +248,20 @@ jobs:
       with:
         python-version: '3.8'
     - name: Checkout MX
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       run: |
         VERSION=$(find graal -name "suite.py" -exec grep mxversion {} + | cut -d '"' -f 4 | sort --unique --reverse | head -n 1)
         git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} mx
         ./mx/mx --version
       shell: bash
     - uses: actions/cache@v2.1.5
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       with:
         path: ~/.mx
         key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
         restore-keys: ${{ runner.os }}-mx-
     - name: Build graalvm native-image
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       run: |
         cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
         Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
@@ -240,11 +279,11 @@ jobs:
         mv ${graalvm-home} $Env:JAVA_HOME
         & $Env:JAVA_HOME\bin\native-image --version
     - name: Archive JDK
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       shell: bash
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist GraalVM CE build
-      if: inputs.build-from-source == true && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       uses: actions/upload-artifact@v2
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
@@ -255,9 +294,10 @@ jobs:
     runs-on: windows-2019
     needs:
       - get-test-matrix
+      - build-vars
     steps:
     - name: Get Mandrel ${{ inputs.version }}
-      if: inputs.build-from-source == false && inputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == false && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
       run: |
         $VERSION="${{ inputs.version }}"
         $VERSION_SHORT=@($VERSION -replace 'mandrel-')
@@ -268,7 +308,7 @@ jobs:
         Move-Item -Path "$Env:temp\mandrel-*" -Destination $Env:JAVA_HOME
         & $Env:JAVA_HOME\bin\native-image --version
     - name: Get GraalVM CE ${{ inputs.version }}
-      if: inputs.build-from-source == false && inputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == false && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
       run: |
         $VERSION="${{ inputs.version }}"
         $VERSION_SHORT=@($VERSION -replace 'vm-')
@@ -289,11 +329,11 @@ jobs:
     #     Move-Item -Path "$Env:temp\jdk-*" -Destination $Env:JAVA_HOME
     #     & $Env:JAVA_HOME\bin\java -version
     - name: Archive JDK
-      if: inputs.build-from-source == false #|| inputs.builder-image != 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == false #|| inputs.builder-image != 'null'
       shell: bash
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel/GraalVM or OpenJDK
-      if: inputs.build-from-source == false #|| inputs.builder-image != 'null'
+      if: fromJson(needs.build-vars.outputs.build-from-source) == false #|| inputs.builder-image != 'null'
       uses: actions/upload-artifact@v2
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}

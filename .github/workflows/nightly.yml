@@ -62,7 +62,7 @@ jobs:
     with:
       quarkus-version: "main"
       version: "graal/master"
-      distribution: "graalvm"
+      build-type: "graal-source"
   q-main-mandrel-17-latest:
     name: "Q main M 17 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
@@ -93,7 +93,7 @@ jobs:
     with:
       quarkus-version: "main"
       version: "graal/master"
-      distribution: "graalvm"
+      build-type: "graal-source"
       jdk: "17/ea"
   ####
   # Test Quarkus main with 22_0-dev built as Mandrel and GraalVM
@@ -121,7 +121,7 @@ jobs:
   #     quarkus-version: "main"
   #     repo: "oracle/graal"
   #     version: "release/graal-vm/22.0"
-  #     distribution: "graalvm"
+  #     built-type: "graal-source"
   ####
   # Test Quarkus with supported Mandrel versions using the Quay.io images
   ####
@@ -146,14 +146,14 @@ jobs:
   #  with:
   #    quarkus-version: "main"
   #     version: "mandrel-20.3.1.2-Final"
-  #     build-from-source: "false"
+  #     built-type: "mandrel-release"
   #q-main-mandrel-21_0-release
   #  name: "Q main M 21.0 release"
   #  uses: graalvm/mandrel/.github/workflows/base.yml@default
   #  with:
   #    quarkus-version: "main"
   #     version: "mandrel-21.0.0.0-Final"
-  #     build-from-source: "false"
+  #     built-type: "mandrel-release"
   ####
   # Test Quarkus main with supported GraalVM versions using the release archives
   ####
@@ -163,13 +163,11 @@ jobs:
   #  with:
   #    quarkus-version: "main"
   #     version: "vm-20.3.2"
-  #     build-from-source: "false"
-  #     distribution: "graalvm"
+  #     built-type: "graal-release"
   #q-main-graal-21_0-release
   #  name: "Q main G 21.0 release"
   #  uses: graalvm/mandrel/.github/workflows/base.yml@default
   #  with:
   #    quarkus-version: "main"
   #     version: "vm-21.1.0"
-  #     build-from-source: "false"
-  #     distribution: "graalvm"
+  #     built-type: "graal-release"

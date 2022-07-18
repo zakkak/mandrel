@@ -33,14 +33,15 @@ on:
         type: string
         description: 'Mandrel packaging repository to be used'
         default: "graalvm/mandrel-packaging"
-      distribution:
-        type: string
-        description: 'Distribution to build, mandrel or graalvm'
-        default: "mandrel"
-      build-from-source:
-        type: boolean
-        description: 'Build Mandrel from source instead of grabing a release'
-        default: true
+      build-type:
+        type: choice
+        description: 'Build distribution (graal/mandrel) from source or use released binaries'
+        default: "mandrel-source"
+        options:
+          - "mandrel-source"
+          - "graal-source"
+          - "mandrel-release"
+          - "graal-release"
       jdk:
         type: choice
         description: 'OpenJDK to use. One of 11/ga, 11/ea, 17/ga, 17/ea (/ga and /ea suffixes are only relevant when building from source)'
@@ -65,7 +66,6 @@ jobs:
       version: ${{ github.event.inputs.version }}
       mandrel-packaging-version: ${{ github.event.inputs.mandrel-packaging-version }}
       mandrel-packaging-repo: ${{ github.event.inputs.mandrel-packaging-repo }}
-      distribution: ${{ github.event.inputs.distribution }}
-      build-from-source: ${{ fromJson(github.event.inputs.build-from-source) }}
+      build-type: ${{ github.event.inputs.build-type }}
       jdk: ${{ github.event.inputs.jdk }}
       builder-image: ${{ github.event.inputs.builder-image }}
