@@ -55,6 +55,10 @@ on:
         type: string
         description: 'The builder image to use instead of a release or building from source (e.g. quay.io/quarkus/ubi-quarkus-mandrel:20.3-java11)'
         default: "null"
+      build-stats-tag:
+        type: string
+        description: 'The tag to use for build stats uploads of native tests (e.g. 22.3.0-dev-jdk17-prepatch-x)'
+        default: "null"
 
 jobs:
   delegate:
@@ -69,3 +73,6 @@ jobs:
       build-type: ${{ github.event.inputs.build-type }}
       jdk: ${{ github.event.inputs.jdk }}
       # builder-image: ${{ github.event.inputs.builder-image }}
+      build-stats-tag: ${{ github.event.inputs.build-stats-tag }}
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
