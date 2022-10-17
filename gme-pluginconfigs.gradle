@@ -1,0 +1,23 @@
+/**
+ * This file is injected at the end by the Gradle Manipulation Tool during the analysis phase
+ *
+ * It is being used for extra configuration for badly behaved plugins
+ */
+
+if (!project.hasProperty("gmeAnalyse")) {
+    allprojects {
+        afterEvaluate { project ->
+            // Make sure that if the dokka task has been configured on the build,
+            // we further configure it to not use the network at all
+            // <DOKKA>
+
+            project.pluginManager.withPlugin("com.bmuschko.nexus") {
+                project.ext.nexusUsername = ""
+                project.ext.nexusPassword = ""
+                nexus {
+                    sign = false
+                }
+            }
+        }
+    }
+}
