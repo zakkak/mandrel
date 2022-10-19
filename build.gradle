@@ -1,0 +1,6 @@
+buildscript { apply from: "gme.gradle" }
+apply plugin: "java"
+group = "org.graalvm.sdk"
+version = "22.3.0.1-1"
+
+apply from: "gme-pluginconfigs.gradle"
