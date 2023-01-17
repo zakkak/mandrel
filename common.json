@@ -1,6 +1,8 @@
 {
   "README": "This file contains definitions that are useful for the hocon and jsonnet CI files of multiple repositories.",
 
+  "mx_version" : "5.310.0",
+
   "jdks": {
     "openjdk8":           {"name": "openjdk",   "version": "8u302+06-jvmci-21.3-b05", "platformspecific": true },
     "oraclejdk8":         {"name": "oraclejdk", "version": "8u341+10-jvmci-21.3-b19", "platformspecific": true },
