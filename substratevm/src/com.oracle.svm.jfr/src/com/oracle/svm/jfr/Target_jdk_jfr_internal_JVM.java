@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
 package com.oracle.svm.jfr;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 import org.graalvm.nativeimage.ProcessProperties;
 
@@ -41,6 +42,7 @@ import com.oracle.svm.core.jdk.JDK15OrLater;
 import com.oracle.svm.core.jdk.JDK16OrEarlier;
 import com.oracle.svm.core.util.VMError;
 import com.oracle.svm.jfr.traceid.JfrTraceId;
+import com.oracle.svm.util.ReflectionUtil;
 
 import jdk.jfr.Event;
 import jdk.jfr.internal.EventWriter;
@@ -53,8 +55,38 @@ import jdk.jfr.internal.handlers.EventHandler;
 @TargetClass(value = jdk.jfr.internal.JVM.class, onlyWith = JfrEnabled.class)
 public final class Target_jdk_jfr_internal_JVM {
     // Checkstyle: stop
-    @Alias static Object FILE_DELTA_CHANGE;
+    @Alias @TargetElement(onlyWith = JvmChunkRotationMonitorAvailable.class) //
+    static Object CHUNK_ROTATION_MONITOR;
+
+    @Alias @TargetElement(onlyWith = JvmFileDeltaChangeAvailable.class) //
+    static Object FILE_DELTA_CHANGE;
     // Checkstyle: resume
+
+    static class JvmChunkRotationMonitorAvailable extends JvmFieldAvailable {
+        protected JvmChunkRotationMonitorAvailable() {
+            super("CHUNK_ROTATION_MONITOR");
+        }
+    }
+
+    private static class JvmFileDeltaChangeAvailable extends JvmFieldAvailable {
+        protected JvmFileDeltaChangeAvailable() {
+            super("FILE_DELTA_CHANGE");
+        }
+    }
+
+    private abstract static class JvmFieldAvailable implements BooleanSupplier {
+
+        private final String fieldName;
+
+        protected JvmFieldAvailable(String fieldName) {
+            this.fieldName = fieldName;
+        }
+
+        @Override
+        public boolean getAsBoolean() {
+            return ReflectionUtil.lookupField(true, JVM.class, fieldName) != null;
+        }
+    }
 
     @Alias @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.Reset) //
     private volatile boolean nativeOK;
