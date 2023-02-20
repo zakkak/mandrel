@@ -38,7 +38,6 @@ import com.oracle.svm.core.util.VMError;
  */
 public class JfrRecorderThread extends Thread {
     private static final int BUFFER_FULL_ENOUGH_PERCENTAGE = 50;
-    private static final boolean CHUNK_ROTATION_MONITOR_PRESENT = (new Target_jdk_jfr_internal_JVM.JvmChunkRotationMonitorAvailable()).getAsBoolean();
 
     private final JfrGlobalMemory globalMemory;
     private final JfrUnlockedChunkWriter unlockedChunkWriter;
@@ -101,15 +100,21 @@ public class JfrRecorderThread extends Thread {
                 boolean shouldNotify = persistBuffer(chunkWriter, buffer);
                 if (shouldNotify) {
                     // Checkstyle: stop
-                    Object chunkRotationMonitor = CHUNK_ROTATION_MONITOR_PRESENT
-                                    ? Target_jdk_jfr_internal_JVM.CHUNK_ROTATION_MONITOR
-                                    : Target_jdk_jfr_internal_JVM.FILE_DELTA_CHANGE;
+                    Object chunkRotationMonitor = getChunkRotationMonitor();
                     synchronized (chunkRotationMonitor) {
                         chunkRotationMonitor.notifyAll();
                     }
                     // Checkstyle: resume
                 }
             }
+        }
+    }
+
+    private static Object getChunkRotationMonitor() {
+        if (HasChunkRotationMonitorField.get()) {
+            return Target_jdk_jfr_internal_JVM.CHUNK_ROTATION_MONITOR;
+        } else {
+            return Target_jdk_jfr_internal_JVM.FILE_DELTA_CHANGE;
         }
     }
 
