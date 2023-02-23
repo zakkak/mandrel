@@ -33,7 +33,9 @@ for bs in $(find $DIR -name \*build-output-stats.json); do
   # import the stat
   stat_id=$(curl -s -w '\n' -H "Content-Type: application/json" \
             -H "token: $TOKEN" --post302 --data "@$(pwd)/$bs" "$URL/import?t=$TAG" | jq .id)
-  # update timing info
-  curl -s -w '\n' -H "Content-Type: application/json" -H "token: $TOKEN" \
-	  -X PUT --data "@$ts" "$URL/$stat_id" > /dev/null
+  # update timing info if present
+  if [ -e "$ts" ]; then
+    curl -s -w '\n' -H "Content-Type: application/json" -H "token: $TOKEN" \
+	    -X PUT --data "@$ts" "$URL/$stat_id" > /dev/null
+  fi
 done
