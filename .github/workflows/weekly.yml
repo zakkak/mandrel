@@ -67,7 +67,7 @@ jobs:
     name: "Q 2.13 M 22.3 image"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
-      quarkus-version: "2.13"
+      quarkus-version: "2.13.4.Final"
       builder-image: "quay.io/quarkus/ubi-quarkus-mandrel-builder-image:22.3-java17"
   q-main-mandrel-22_3-quayio:
     name: "Q main M 22.3 image"
@@ -82,7 +82,7 @@ jobs:
     name: "Q 2.7 M 21.3 image"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
-      quarkus-version: "2.7"
+      quarkus-version: "2.7.5.Final"
       builder-image: "quay.io/quarkus/ubi-quarkus-mandrel:21.3-java11"
   ####
   # Test Quarkus main with supported Mandrel versions using the release archives
