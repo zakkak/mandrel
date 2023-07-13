@@ -50,6 +50,9 @@ jobs:
       quarkus-version: "main"
       version: "graal/master"
       jdk: "21/ea"
+      issue-number: "522"
+      issue-repo: "graalvm/mandrel"
+      mandrel-it-issue-number: "168"
       build-stats-tag: "gha-linux-qmain-mlatest-jdk21ea"
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
@@ -59,6 +62,9 @@ jobs:
     with:
       quarkus-version: "main"
       version: "graal/master"
+      issue-number: "523"
+      issue-repo: "graalvm/mandrel"
+      mandrel-it-issue-number: "169"
       jdk: "21/ea"
       build-stats-tag: "gha-win-qmain-mlatest-jdk21ea"
     secrets:
