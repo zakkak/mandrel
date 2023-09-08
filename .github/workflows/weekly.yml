@@ -30,33 +30,33 @@ concurrency:
 
 jobs:
   ####
-  # Test GraalVM tip with JDK 17
+  # Test Mandrel 23.1 with JDK 21
   ####
-  q-main-mandrel-17-latest:
-    name: "Q main M 17 latest"
+  q-main-mandrel-23_1:
+    name: "Q main M 23.1"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
-      version: "graal/master"
-      jdk: "17/ea"
-      issue-number: "399"
+      version: "mandrel/23.1"
+      jdk: "21/ea"
+      issue-number: "563"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "102"
-      build-stats-tag: "gha-linux-qmain-mlatest-jdk17ea"
+      mandrel-it-issue-number: "198"
+      build-stats-tag: "gha-linux-qmain-m23_1-jdk21ea"
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-17-latest-win:
-    name: "Q main M 17 latest windows"
+  q-main-mandrel-23_1-win:
+    name: "Q main M 23.1 windows"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
-      version: "graal/master"
-      jdk: "17/ea"
-      issue-number: "400"
+      version: "mandrel/23.1"
+      jdk: "21/ea"
+      issue-number: "562"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "104"
-      build-stats-tag: "gha-win-qmain-mlatest-jdk17ea"
+      mandrel-it-issue-number: "199"
+      build-stats-tag: "gha-win-qmain-m23_1-jdk21ea"
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
