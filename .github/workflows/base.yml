@@ -210,20 +210,38 @@ jobs:
     - name: Build Mandrel
       if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' && inputs.builder-image == 'null'}}
       run: |
+        rm -rf ~/.m2/repository/org/graalvm
         cd ${MANDREL_PACKAGING_REPO}
         ${JAVA_HOME}/bin/java -ea build.java \
           --mx-home ${MX_PATH} \
           --mandrel-repo ${MANDREL_REPO} \
           --mandrel-home ${MANDREL_HOME} \
-          --archive-suffix tar.gz
+          --archive-suffix tar.gz \
+          --maven-deploy-local
         ${MANDREL_HOME}/bin/native-image --version
         mv mandrel-java*-linux-amd64-*.tar.gz ${{ github.workspace }}/jdk.tgz
+        rm -rf graalvm-maven-artefacts.tgz && tar -czvf graalvm-maven-artefacts.tgz -C ~ .m2/repository/org/graalvm
+        mv graalvm-maven-artefacts.tgz ${{ github.workspace }}
+        rm -rf graalvm-version.tgz && tar -czvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})/.maven-version
+        mv graalvm-version.tgz ${{ github.workspace }}
     - name: Persist Mandrel build
       if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' && inputs.builder-image == 'null'}}
       uses: actions/upload-artifact@v3
       with:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
+    - name: Persist local maven repository
+      if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' && inputs.builder-image == 'null'}}
+      uses: actions/upload-artifact@v3
+      with:
+        name: org-graalvm-artefacts-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: graalvm-maven-artefacts.tgz
+    - name: Persist GraalVM maven version
+      if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' && inputs.builder-image == 'null'}}
+      uses: actions/upload-artifact@v3
+      with:
+        name: mandrel-maven-version-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: graalvm-version.tgz
 
   build-graal:
     name: GraalVM CE build
@@ -317,6 +335,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - get-test-matrix
+      - build-mandrel
     strategy:
       fail-fast: false
     steps:
@@ -344,18 +363,41 @@ jobs:
           cd quarkus
           bash ../workflow-mandrel/.github/update_quarkus_version.sh 2.2.999
         fi
-    # Use Java 17 to build Quarkus as it doesn't build with Java 20
+    # Use Java 11 to build Quarkus as that's the lowest supported JDK version currently
     - uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
-        java-version: '17'
+        java-version: '11'
+    - name: Download GraalVM Maven Repo
+      uses: actions/download-artifact@v3
+      with:
+        name: org-graalvm-artefacts-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: .
+    - name: Download GraalVM Maven Version
+      uses: actions/download-artifact@v3
+      with:
+        name: mandrel-maven-version-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: .
+    - name: Extract GraalVM Maven Repo and GraalVM Maven Version
+      shell: bash
+      run: |
+        tar -xzvf graalvm-maven-artefacts.tgz -C ~
+        tar -xzvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME})
     - name: Build quarkus
       run: |
+        rm -f maven_graalvm_before_build.txt maven_graalvm_after_build.txt
+        find ~/.m2/repository/org/graalvm | sort > maven_graalvm_before_build.txt
+        GRAAL_MVN_ARTIFACTS_VERS=$(cat ${MANDREL_HOME}/.maven-version)
+        echo "Building quarkus with locally installed GraalVM maven artefacts in version: ${GRAAL_MVN_ARTIFACTS_VERS}"
         cd ${QUARKUS_PATH}
-        ./mvnw -e -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml  -Dquickly
+        ./mvnw -e -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml -Dquickly -Dgraal-sdk.version="${GRAAL_MVN_ARTIFACTS_VERS}"
+        cd -
+        find ~/.m2/repository/org/graalvm | sort > maven_graalvm_after_build.txt
+        diff -u maven_graalvm_before_build.txt maven_graalvm_after_build.txt
     - name: Tar Maven Repo
       shell: bash
-      run: tar -czvf maven-repo.tgz -C ~ .m2/repository
+      run: |
+        tar -czvf maven-repo.tgz -C ~ .m2/repository
     - name: Persist Maven Repo
       uses: actions/upload-artifact@v3
       with:
@@ -363,7 +405,9 @@ jobs:
         path: maven-repo.tgz
     - name: Delete Local Artifacts From Cache
       shell: bash
-      run: rm -r ~/.m2/repository/io/quarkus
+      run: |
+        rm -rf ~/.m2/repository/org/graalvm
+        rm -r ~/.m2/repository/io/quarkus
 
   native-tests:
     name: Q IT ${{ matrix.category }}
