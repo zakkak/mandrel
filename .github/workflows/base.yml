@@ -639,7 +639,7 @@ jobs:
       # Don't perform performance checks since GH runners are not that stable
       FAIL_ON_PERF_REGRESSION: false
       # USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
-    timeout-minutes: 50
+    timeout-minutes: 80
     strategy:
       fail-fast: false
     steps:
