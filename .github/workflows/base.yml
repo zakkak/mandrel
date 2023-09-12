@@ -283,10 +283,21 @@ jobs:
     - name: Build graalvm native-image
       if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' && inputs.builder-image == 'null'}}
       run: |
+        rm -rf ~/.m2/repository/org/graalvm
         cd graal/substratevm
         ${MX_PATH}/mx --native=native-image,lib:jvmcicompiler,lib:native-image-agent,lib:native-image-diagnostics-agent --components="Native Image,LibGraal,svml" build
         mv $(${MX_PATH}/mx --native=native-image,lib:jvmcicompiler,lib:native-image-agent,lib:native-image-diagnostics-agent --components="Native Image,LibGraal,svml" graalvm-home) ${MANDREL_HOME}
         ${MANDREL_HOME}/bin/native-image --version
+        cd ../
+        # Deploy maven artefacts to local repository
+        ${MX_PATH}/mx --primary-suite-path sdk maven-deploy --suppress-javadoc 2>&1 | tee maven_deploy.log
+        rm -rf graalvm-maven-artefacts.tgz && tar -czvf graalvm-maven-artefacts.tgz -C ~ .m2/repository/org/graalvm
+        mv graalvm-maven-artefacts.tgz ${{ github.workspace }}
+        MAVEN_VERS=$(for token in $(head -n1 maven_deploy.log); do if echo $token | grep -q 'SNAPSHOT'; then echo $token; fi; done)
+        echo "GraalVM maven version is: ${MAVEN_VERS}"
+        echo ${MAVEN_VERS} > ${MANDREL_HOME}/.maven-version
+        rm -rf graalvm-version.tgz && tar -czvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})/.maven-version
+        mv graalvm-version.tgz ${{ github.workspace }}
     - name: Tar GraalVM
       if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' && inputs.builder-image == 'null'}}
       run: tar czvf jdk.tgz  -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})
@@ -296,6 +307,18 @@ jobs:
       with:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
+    - name: Persist local maven repository
+      if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' && inputs.builder-image == 'null'}}
+      uses: actions/upload-artifact@v3
+      with:
+        name: org-graalvm-artefacts-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: graalvm-maven-artefacts.tgz
+    - name: Persist GraalVM maven version
+      if: ${{ fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' && inputs.builder-image == 'null'}}
+      uses: actions/upload-artifact@v3
+      with:
+        name: mandrel-maven-version-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: graalvm-version.tgz
 
   get-jdk:
     name: Get JDK ${{ inputs.jdk }}
@@ -336,6 +359,7 @@ jobs:
     needs:
       - get-test-matrix
       - build-mandrel
+      - build-graal
     strategy:
       fail-fast: false
     steps:
