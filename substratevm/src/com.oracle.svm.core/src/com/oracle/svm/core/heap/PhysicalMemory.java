@@ -26,6 +26,7 @@ package com.oracle.svm.core.heap;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.word.UnsignedWord;
@@ -59,6 +60,7 @@ public class PhysicalMemory {
 
     private static final CountDownLatch CACHED_SIZE_AVAIL_LATCH = new CountDownLatch(1);
     private static final AtomicInteger INITIALIZING = new AtomicInteger(0);
+    private static final ReentrantLock LOCK = new ReentrantLock();
     private static final UnsignedWord UNSET_SENTINEL = UnsignedUtils.MAX_VALUE;
     private static UnsignedWord cachedSize = UNSET_SENTINEL;
 
@@ -90,9 +92,9 @@ public class PhysicalMemory {
             throw VMError.shouldNotReachHere("Accessing the physical memory size may require allocation and synchronization");
         }
 
-        synchronized (INITIALIZING) {
+        LOCK.lock();
+        try {
             if (!isInitialized()) {
-                VMError.guarantee(INITIALIZING.get() <= 1, "Must not initialize twice");
                 if (isInitializing()) {
                     /*
                      * Recursive initializations need to wait for the one initializing thread to
@@ -110,23 +112,22 @@ public class PhysicalMemory {
                     }
                 }
                 INITIALIZING.incrementAndGet();
-                try {
-                    long memoryLimit = SubstrateOptions.MaxRAM.getValue();
-                    if (memoryLimit > 0) {
-                        cachedSize = WordFactory.unsigned(memoryLimit);
-                    } else {
-                        memoryLimit = Containers.memoryLimitInBytes();
-                        cachedSize = memoryLimit > 0
-                                        ? WordFactory.unsigned(memoryLimit)
-                                        : ImageSingletons.lookup(PhysicalMemorySupport.class).size();
-                    }
-                    // Now that we have set the cachedSize let other threads know it's
-                    // available to use.
-                    CACHED_SIZE_AVAIL_LATCH.countDown();
-                } finally {
-                    INITIALIZING.incrementAndGet();
+                long memoryLimit = SubstrateOptions.MaxRAM.getValue();
+                if (memoryLimit > 0) {
+                    cachedSize = WordFactory.unsigned(memoryLimit);
+                } else {
+                    memoryLimit = Containers.memoryLimitInBytes();
+                    cachedSize = memoryLimit > 0
+                                    ? WordFactory.unsigned(memoryLimit)
+                                    : ImageSingletons.lookup(PhysicalMemorySupport.class).size();
                 }
+                // Now that we have set the cachedSize let other threads know it's
+                // available to use.
+                INITIALIZING.incrementAndGet();
+                CACHED_SIZE_AVAIL_LATCH.countDown();
             }
+        } finally {
+            LOCK.unlock();
         }
 
         return cachedSize;
