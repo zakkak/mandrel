@@ -1774,12 +1774,23 @@ public class NativeImage {
             listModulesProcess = pb.start();
 
             List<String> lines;
+            List<String> errLines;
             try (var br = new BufferedReader(new InputStreamReader(listModulesProcess.getInputStream()))) {
                 lines = br.lines().toList();
             }
+            try (var br = new BufferedReader(new InputStreamReader(listModulesProcess.getErrorStream()))) {
+                errLines = br.lines().toList();
+            }
             int exitStatus = listModulesProcess.waitFor();
             if (exitStatus != 0) {
-                throw showError("Determining image-builder observable modules failed (Exit status %d). Process output: %n%s".formatted(exitStatus, String.join(System.lineSeparator(), lines)));
+                String output = String.join(System.lineSeparator(), lines);
+                String errout = String.join(System.lineSeparator(), errLines);
+                String cmdStr = pb.command().stream().collect(Collectors.joining(" "));
+                String errorFormat = "Determining image-builder observable modules failed " +
+                        "(Exit status %d). Process output: %n%s%n" +
+                        "Process error: %n%s%n" +
+                        "Command was: %s%n";
+                throw showError(errorFormat.formatted(exitStatus, output, errout, cmdStr));
             }
             for (String line : lines) {
                 String[] splitString = StringUtil.split(line, " ", 3);
