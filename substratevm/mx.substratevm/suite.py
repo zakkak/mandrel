@@ -2,7 +2,7 @@
 suite = {
     "mxversion": "6.27.1",
     "name": "substratevm",
-    "version" : "23.1.0.1",
+    "version" : "23.1.1.0",
     "release" : False,
     "url" : "https://github.com/oracle/graal/tree/master/substratevm",
 
@@ -309,9 +309,6 @@ suite = {
                     "jdk.jfr.events",
                     "jdk.jfr.internal",
                     "jdk.jfr.internal.jfc",
-                ],
-                "jdk.jfr@11..18": [
-                    "jdk.jfr.internal.handlers",
                 ],
                 "jdk.internal.vm.ci": [
                     "jdk.vm.ci.meta",
