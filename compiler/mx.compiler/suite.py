@@ -4,7 +4,7 @@ suite = {
   "sourceinprojectwhitelist" : [],
 
   "groupId" : "org.graalvm.compiler",
-  "version" : "23.1.0.1",
+  "version" : "23.1.1.0",
   "release" : False,
   "url" : "http://www.graalvm.org/",
   "developer" : {
@@ -255,6 +255,7 @@ suite = {
         "java.base" : [
           "jdk.internal.module",
           "jdk.internal.misc",
+          "jdk.internal.vm.annotation",
         ],
         "java.instrument" : [
           "sun.instrument",
