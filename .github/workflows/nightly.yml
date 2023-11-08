@@ -32,6 +32,17 @@ jobs:
   ####
   # Test Quarkus main with latest graal sources built as Mandrel and GraalVM
   ####
+  q-main-graal-22-latest:
+    name: "Q main G 22 latest"
+    uses: graalvm/mandrel/.github/workflows/base.yml@default
+    with:
+      quarkus-version: "main"
+      version: "graal/master"
+      build-type: "graal-source"
+      jdk: "latest/ea"
+      build-stats-tag: "gha-linux-graal-qmain-glatest-jdk22ea"
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   q-main-graal-21-latest:
     name: "Q main G 21 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
@@ -40,34 +51,34 @@ jobs:
       version: "graal/master"
       build-type: "graal-source"
       jdk: "21/ea"
-      build-stats-tag: "gha-linux-qmain-glatest-jdk21ea"
+      build-stats-tag: "gha-linux-graal-qmain-glatest-jdk21ea"
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-21-latest:
-    name: "Q main M 21 latest"
+  q-main-mandrel-22-latest:
+    name: "Q main M 22 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
       version: "graal/master"
-      jdk: "21/ea"
-      issue-number: "522"
+      jdk: "22/ea"
+      issue-number: "580"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "168"
-      build-stats-tag: "gha-linux-qmain-mlatest-jdk21ea"
+      mandrel-it-issue-number: "208"
+      build-stats-tag: "gha-linux-mandrel-qmain-mlatest-jdk22ea"
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-21-latest-win:
-    name: "Q main M 21 latest windows"
+  q-main-mandrel-22-latest-win:
+    name: "Q main M 22 latest windows"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
       version: "graal/master"
-      issue-number: "523"
+      issue-number: "579"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "169"
-      jdk: "21/ea"
-      build-stats-tag: "gha-win-qmain-mlatest-jdk21ea"
+      mandrel-it-issue-number: "208"
+      jdk: "22/ea"
+      build-stats-tag: "gha-win-mandrel-qmain-mlatest-jdk22ea"
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
