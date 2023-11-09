@@ -61,6 +61,21 @@ jobs:
 #      ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
 #      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   ####
+  # Test Q main and GraalVM CE JDK 21 since Mandrel 21 builds are
+  # currently not possible (#598)
+  ####
+  q-main-graal-21-latest:
+    name: "Q main G 21 latest"
+    uses: graalvm/mandrel/.github/workflows/base.yml@default
+    with:
+      quarkus-version: "main"
+      version: "graal/master"
+      build-type: "graal-source"
+      jdk: "21/ea"
+      build-stats-tag: "gha-linux-graal-qmain-glatest-jdk21ea"
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
+  ####
   # Test Q main and Mandrel 23.1 JDK 21
   ####
   q-main-mandrel-23_1:

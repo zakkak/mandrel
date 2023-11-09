@@ -43,17 +43,6 @@ jobs:
       build-stats-tag: "gha-linux-graal-qmain-glatest-jdk22ea"
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-graal-21-latest:
-    name: "Q main G 21 latest"
-    uses: graalvm/mandrel/.github/workflows/base.yml@default
-    with:
-      quarkus-version: "main"
-      version: "graal/master"
-      build-type: "graal-source"
-      jdk: "21/ea"
-      build-stats-tag: "gha-linux-graal-qmain-glatest-jdk21ea"
-    secrets:
-      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   q-main-mandrel-22-latest:
     name: "Q main M 22 latest"
     uses: graalvm/mandrel/.github/workflows/base.yml@default
