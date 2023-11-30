@@ -65,7 +65,7 @@ jobs:
       version: "graal/master"
       issue-number: "579"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "208"
+      mandrel-it-issue-number: "207"
       jdk: "22/ea"
       build-stats-tag: "gha-win-mandrel-qmain-mlatest-jdk22ea"
     secrets:
