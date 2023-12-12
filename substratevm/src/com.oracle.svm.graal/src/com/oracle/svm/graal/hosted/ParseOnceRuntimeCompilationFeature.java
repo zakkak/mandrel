@@ -106,7 +106,6 @@ import com.oracle.svm.core.graal.nodes.DeoptEntryNode;
 import com.oracle.svm.core.graal.nodes.DeoptEntrySupport;
 import com.oracle.svm.core.graal.nodes.DeoptProxyAnchorNode;
 import com.oracle.svm.core.graal.nodes.InlinedInvokeArgumentsNode;
-import com.oracle.svm.core.graal.stackvalue.StackValueNode;
 import com.oracle.svm.core.option.HostedOptionKey;
 import com.oracle.svm.core.option.HostedOptionValues;
 import com.oracle.svm.core.util.VMError;
@@ -743,14 +742,13 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
     }
 
     @Override
-    protected void requireFrameInformationForMethodHelper(AnalysisMethod aMethod) {
-        /*
-         * Note: it may be necessary to also register this method as a registeredRuntimeCompilation
-         * (or in a new datastructure) to ensure these deoptimization targets are parsed during
-         * analysis.
-         */
+    protected void requireFrameInformationForMethodHelper(AnalysisMethod aMethod, FeatureImpl.BeforeAnalysisAccessImpl config, boolean registerAsRoot) {
+        assert aMethod.isOriginalMethod();
         AnalysisMethod deoptTarget = aMethod.getOrCreateMultiMethod(DEOPT_TARGET_METHOD);
         SubstrateCompilationDirectives.singleton().registerFrameInformationRequired(aMethod, deoptTarget);
+        if (registerAsRoot) {
+            config.registerAsRoot(aMethod, true, "Frame information required, registered in " + ParseOnceRuntimeCompilationFeature.class, DEOPT_TARGET_METHOD);
+        }
     }
 
     private class RuntimeCompilationParsingSupport implements SVMParsingSupport {
@@ -831,26 +829,17 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
                     }
                 }
 
-                if (graph.getNodes(StackValueNode.TYPE).isNotEmpty()) {
-                    /*
-                     * Stack allocated memory is not seen by the deoptimization code, i.e., it is
-                     * not copied in case of deoptimization. Also, pointers to it can be used for
-                     * arbitrary address arithmetic, so we would not know how to update derived
-                     * pointers into stack memory during deoptimization. Therefore, we cannot allow
-                     * methods that allocate stack memory for runtime compilation. To remove this
-                     * limitation, we would need to change how we handle stack allocated memory in
-                     * Graal.
-                     */
-                    recordFailed(method);
-                    return HostVM.PARSING_FAILED;
-                }
-
                 CanonicalizerPhase canonicalizer = CanonicalizerPhase.create();
                 canonicalizer.apply(graph, analysisProviders);
                 if (deoptimizeOnExceptionPredicate != null) {
                     new DeoptimizeOnExceptionPhase(deoptimizeOnExceptionPredicate).apply(graph);
                 }
                 new ConvertDeoptimizeToGuardPhase(canonicalizer).apply(graph, analysisProviders);
+
+                if (DeoptimizationUtils.createGraphInvalidator(graph).get()) {
+                    recordFailed(method);
+                    return HostVM.PARSING_FAILED;
+                }
 
             } catch (Throwable ex) {
                 debug.handle(ex);
@@ -868,22 +857,13 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
         public boolean validateGraph(PointsToAnalysis bb, StructuredGraph graph) {
             PointsToAnalysisMethod aMethod = (PointsToAnalysisMethod) graph.method();
             MultiMethod.MultiMethodKey multiMethodKey = aMethod.getMultiMethodKey();
-            Supplier<Boolean> hasStackValues = () -> graph.getNodes(StackValueNode.TYPE).isNotEmpty();
-            if (aMethod.isOriginalMethod() && DeoptimizationUtils.canDeoptForTesting(aMethod, false, hasStackValues)) {
+            Supplier<Boolean> graphInvalidator = DeoptimizationUtils.createGraphInvalidator(graph);
+            if (aMethod.isOriginalMethod() && DeoptimizationUtils.canDeoptForTesting(aMethod, false, graphInvalidator)) {
                 DeoptimizationUtils.registerDeoptEntriesForDeoptTesting(bb, graph, aMethod);
                 return true;
             }
             if (multiMethodKey != ORIGINAL_METHOD) {
-                if (hasStackValues.get()) {
-                    /*
-                     * Stack allocated memory is not seen by the deoptimization code, i.e., it is
-                     * not copied in case of deoptimization. Also, pointers to it can be used for
-                     * arbitrary address arithmetic, so we would not know how to update derived
-                     * pointers into stack memory during deoptimization. Therefore, we cannot allow
-                     * methods that allocate stack memory for runtime compilation. To remove this
-                     * limitation, we would need to change how we handle stack allocated memory in
-                     * Graal.
-                     */
+                if (graphInvalidator.get()) {
                     recordFailed(aMethod);
                     return false;
                 }
@@ -1092,7 +1072,7 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
                 var originalTarget = implementation.getMultiMethod(ORIGINAL_METHOD);
                 assert originalTarget != null;
                 runtimeCompilationCandidates.add(new RuntimeCompilationCandidateImpl(originalTarget, originalTarget));
-                return List.of(getDeoptVersion(implementation));
+                return List.of(getStubDeoptVersion(implementation));
             }
             assert implementation.isOriginalMethod() && target.isOriginalMethod();
 
@@ -1102,15 +1082,20 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
                  * Unless the method is a registered runtime compilation, it is not possible for an
                  * original variant to call a runtime variant (and indirectly the deoptimiztation
                  * variant).
+                 *
+                 * However, frame information is matched using the deoptimization entry point of a
+                 * method, so deopt targets must be created for them as well.
                  */
                 if (registeredRuntimeCompilation) {
-                    return List.of(implementation, getDeoptVersion(implementation), getRuntimeVersion(bb, implementation, true, invokeFlow));
+                    return List.of(implementation, getStubDeoptVersion(implementation), getRuntimeVersion(bb, implementation, true, invokeFlow));
+                } else if (SubstrateCompilationDirectives.singleton().isFrameInformationRequired(implementation)) {
+                    return List.of(implementation, getDeoptVersion(bb, implementation, true, invokeFlow));
                 } else if (DeoptimizationUtils.canDeoptForTesting(implementation, false, () -> false)) {
                     /*
                      * If the target is registered for deoptimization, then we must also make a
                      * deoptimized version.
                      */
-                    return List.of(implementation, getDeoptVersion(implementation));
+                    return List.of(implementation, getStubDeoptVersion(implementation));
                 } else {
                     return List.of(implementation);
                 }
@@ -1126,7 +1111,7 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
                      * runtime deoptimizes).
                      */
                     if (runtimeCompilationCandidate) {
-                        return List.of(implementation, getDeoptVersion(implementation), getRuntimeVersion(bb, implementation, true, invokeFlow));
+                        return List.of(implementation, getStubDeoptVersion(implementation), getRuntimeVersion(bb, implementation, true, invokeFlow));
                     } else {
                         /*
                          * If this method cannot be jitted, then only the original implementation is
@@ -1146,7 +1131,7 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
                      * runtime compiled method's invoke.
                      */
                     if (runtimeCompilationCandidate) {
-                        return List.of(implementation, getDeoptVersion(implementation), getRuntimeVersion(bb, implementation, false, invokeFlow));
+                        return List.of(implementation, getStubDeoptVersion(implementation), getRuntimeVersion(bb, implementation, false, invokeFlow));
                     } else {
                         /*
                          * If this method cannot be jitted, then only the original implementation is
@@ -1159,13 +1144,27 @@ public class ParseOnceRuntimeCompilationFeature extends RuntimeCompilationFeatur
 
         }
 
-        @SuppressWarnings("unchecked")
-        protected <T extends AnalysisMethod> T getDeoptVersion(T implementation) {
+        protected <T extends AnalysisMethod> T getStubDeoptVersion(T implementation) {
             /*
              * Flows for deopt versions are only created once a frame state for the method is seen
              * within a runtime compiled method.
              */
-            return (T) implementation.getOrCreateMultiMethod(DEOPT_TARGET_METHOD, (newMethod) -> ((PointsToAnalysisMethod) newMethod).getTypeFlow().setAsStubFlow());
+            return getDeoptVersion(null, implementation, false, null);
+        }
+
+        @SuppressWarnings("unchecked")
+        protected <T extends AnalysisMethod> T getDeoptVersion(BigBang bb, T implementation, boolean createFlow, InvokeTypeFlow parsingReason) {
+            if (createFlow) {
+                PointsToAnalysisMethod runtimeMethod = (PointsToAnalysisMethod) implementation.getOrCreateMultiMethod(DEOPT_TARGET_METHOD);
+                PointsToAnalysis analysis = (PointsToAnalysis) bb;
+                runtimeMethod.getTypeFlow().updateFlowsGraph(analysis, MethodFlowsGraph.GraphKind.FULL, parsingReason, true);
+                return (T) runtimeMethod;
+            } else {
+                /*
+                 * If a flow is not needed then temporarily a stub can be created.
+                 */
+                return (T) implementation.getOrCreateMultiMethod(DEOPT_TARGET_METHOD, (newMethod) -> ((PointsToAnalysisMethod) newMethod).getTypeFlow().setAsStubFlow());
+            }
         }
 
         @SuppressWarnings("unchecked")
