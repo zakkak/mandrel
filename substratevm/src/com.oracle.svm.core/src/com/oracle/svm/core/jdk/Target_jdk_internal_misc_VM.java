@@ -74,10 +74,16 @@ public final class Target_jdk_internal_misc_VM {
     private static boolean pageAlignDirectMemory;
 
     @Alias //
-    public static native void initLevel(int newVal);
+    @SuppressWarnings("unused")
+    public static void initLevel(int newVal) {
+        throw VMError.shouldNotReachHere("This is an alias to the method in the target class, so this code is unreachable");
+    }
 
     @Alias //
-    public static native int initLevel();
+    @SuppressWarnings("unused")
+    public static int initLevel() {
+        return -1; // Aliased code. Should not reach here
+    }
 }
 
 final class DirectMemoryAccessors {
@@ -89,7 +95,7 @@ final class DirectMemoryAccessors {
      * size. That can only be done once PhysicalMemory init completed. We'd introduce a cycle
      * otherwise.
      */
-    private static boolean isInitialized;
+    private static volatile boolean isInitialized;
     private static final AtomicInteger INIT_COUNT = new AtomicInteger();
     private static final long STATIC_DIRECT_MEMORY_AMOUNT = 25 * 1024 * 1024;
     private static long directMemory;
@@ -101,7 +107,7 @@ final class DirectMemoryAccessors {
         return directMemory;
     }
 
-    private static void initialize() {
+    private static synchronized void initialize() {
         if (INIT_COUNT.get() == 2) {
             /*
              * Shouldn't really happen, but safeguard for recursive init anyway
