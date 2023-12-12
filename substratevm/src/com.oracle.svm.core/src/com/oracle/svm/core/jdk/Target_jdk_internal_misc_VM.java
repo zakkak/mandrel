@@ -78,12 +78,6 @@ public final class Target_jdk_internal_misc_VM {
     public static void initLevel(int newVal) {
         throw VMError.shouldNotReachHere("This is an alias to the method in the target class, so this code is unreachable");
     }
-
-    @Alias //
-    @SuppressWarnings("unused")
-    public static int initLevel() {
-        return -1; // Aliased code. Should not reach here
-    }
 }
 
 final class DirectMemoryAccessors {
@@ -140,28 +134,14 @@ final class DirectMemoryAccessors {
                 newDirectMemory = STATIC_DIRECT_MEMORY_AMOUNT; // Static value during initialization
                 INIT_COUNT.incrementAndGet();
             } else {
-                VMError.guarantee(INIT_COUNT.get() <= 1, "Runtime.maxMemory() invariant");
+                VMError.guarantee(INIT_COUNT.get() == 1, "Second cycle needs to have init count 1");
                 /*
                  * Once we know PhysicalMemory has been properly initialized we can use
-                 * Runtime.maxMemory(). Note that we might end up in this branch for code explicitly
-                 * using the JDK cgroups code. At that point PhysicalMemory has likely been
-                 * initialized.
+                 * Runtime.maxMemory()
                  */
                 INIT_COUNT.incrementAndGet();
                 newDirectMemory = Runtime.getRuntime().maxMemory();
             }
-        } else {
-            /*
-             * For explicitly set direct memory we are done
-             */
-            Unsafe.getUnsafe().storeFence();
-            directMemory = newDirectMemory;
-            isInitialized = true;
-            if (Target_jdk_internal_misc_VM.initLevel() < 1) {
-                // only the first accessor needs to set this
-                Target_jdk_internal_misc_VM.initLevel(1);
-            }
-            return;
         }
         VMError.guarantee(newDirectMemory > 0, "New direct memory should be initialized");
 
@@ -174,10 +154,7 @@ final class DirectMemoryAccessors {
              * MAX_MEMORY field.
              */
             isInitialized = true;
-            if (Target_jdk_internal_misc_VM.initLevel() < 1) {
-                // only the first accessor needs to set this
-                Target_jdk_internal_misc_VM.initLevel(1);
-            }
+            Target_jdk_internal_misc_VM.initLevel(1);
         }
     }
 }
