@@ -178,7 +178,7 @@ public class SubstrateOptions {
 
     public static final String IMAGE_CLASSPATH_PREFIX = "-imagecp";
     public static final String IMAGE_MODULEPATH_PREFIX = "-imagemp";
-    public static final String WATCHPID_PREFIX = "-watchpid";
+    public static final String KEEP_ALIVE_PREFIX = "-keepalive";
     private static ValueUpdateHandler<OptimizationLevel> optimizeValueUpdateHandler;
 
     @Fold
@@ -557,6 +557,16 @@ public class SubstrateOptions {
     @Option(help = "How many bytes to pad fields and classes marked @Contended with.") //
     public static final HostedOptionKey<Integer> ContendedPaddingWidth = new HostedOptionKey<>(128);
 
+    @Option(help = "Add additional header bytes to each object, for diagnostic purposes.", type = OptionType.Debug) //
+    public static final HostedOptionKey<Integer> AdditionalHeaderBytes = new HostedOptionKey<>(0, SubstrateOptions::validateAdditionalHeaderBytes);
+
+    private static void validateAdditionalHeaderBytes(HostedOptionKey<Integer> optionKey) {
+        int value = optionKey.getValue();
+        if (value < 0 || value % 4 != 0) {
+            throw UserError.abort("The option '%s' must be 0 or a multiple of 4.", optionKey.getName());
+        }
+    }
+
     /*
      * Isolate tear down options.
      */
@@ -629,7 +639,9 @@ public class SubstrateOptions {
                     isLLVMBackendMissing = ReflectionUtil.lookupClass(true, "com.oracle.svm.core.graal.llvm.LLVMFeature") == null;
                 }
                 if (isLLVMBackendMissing) {
-                    throw UserError.abort("Please install the LLVM backend for GraalVM Native Image via `$JAVA_HOME/bin/gu install native-image-llvm-backend`.");
+                    throw UserError.abort(
+                                    "The LLVM backend for GraalVM Native Image is missing and needs to be build from source. " +
+                                                    "For instructions, please see https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/LLVMBackend.md.");
                 }
 
                 /* See GR-14405, https://github.com/oracle/graal/issues/1056 */
@@ -942,6 +954,9 @@ public class SubstrateOptions {
             SubstrateDiagnostics.updateInitialInvocationCounts(newValue);
         }
     };
+
+    @Option(help = "Only print diagnostic output that is async signal safe.", type = OptionType.Expert)//
+    public static final HostedOptionKey<Boolean> AsyncSignalSafeDiagnostics = new HostedOptionKey<>(false);
 
     @Option(help = "Specifies the number of entries that diagnostic buffers have.", type = OptionType.Debug)//
     public static final HostedOptionKey<Integer> DiagnosticBufferSize = new HostedOptionKey<>(30);

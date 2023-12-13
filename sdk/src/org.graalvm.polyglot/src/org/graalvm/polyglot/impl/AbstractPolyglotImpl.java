@@ -578,6 +578,10 @@ public abstract class AbstractPolyglotImpl {
         return getNext().copyResources(targetFolder, components);
     }
 
+    public String getTruffleVersion() {
+        return null;
+    }
+
     /**
      * Marker base class for native-image.
      */
@@ -1419,6 +1423,10 @@ public abstract class AbstractPolyglotImpl {
 
     public ThreadScope createThreadScope() {
         return getNext().createThreadScope();
+    }
+
+    public boolean isInCurrentEngineHostCallback(Object engine) {
+        return getNext().isInCurrentEngineHostCallback(engine);
     }
 
     public Object newLogHandler(Object logHandlerOrStream) {

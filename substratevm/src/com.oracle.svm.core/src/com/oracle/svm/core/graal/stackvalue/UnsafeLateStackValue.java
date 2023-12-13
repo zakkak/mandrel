@@ -4,7 +4,9 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -20,26 +22,21 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.truffle.espresso.nodes.interop;
+package com.oracle.svm.core.graal.stackvalue;
 
-import com.oracle.truffle.api.interop.InteropLibrary;
-import com.oracle.truffle.espresso.EspressoLanguage;
-import com.oracle.truffle.espresso.impl.ObjectKlass;
-import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
+import org.graalvm.word.PointerBase;
 
-public class ProxyKlass {
+/**
+ * Similar to {@link UnsafeStackValue} but the allocation size only needs to be constant during
+ * compilation (and not during graph building).
+ */
+public final class UnsafeLateStackValue {
 
-    private final ObjectKlass proxyKlass;
-
-    ProxyKlass(ObjectKlass proxyKlass) {
-        this.proxyKlass = proxyKlass;
+    private UnsafeLateStackValue() {
     }
 
-    public ObjectKlass getProxyKlass() {
-        return proxyKlass;
-    }
-
-    public StaticObject createProxyInstance(Object foreignObject, EspressoLanguage language, InteropLibrary interop) {
-        return StaticObject.createForeign(language, proxyKlass, foreignObject, interop);
+    @SuppressWarnings("unused")
+    public static <T extends PointerBase> T get(int size) {
+        throw new IllegalStateException("Cannot invoke method during native image generation");
     }
 }
