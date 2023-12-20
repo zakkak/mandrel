@@ -561,12 +561,10 @@ public class NativeImage {
          */
         public List<Path> getBuilderModulePath() {
             List<Path> result = new ArrayList<>();
-            // Non-jlinked JDKs need truffle and word, collections, nativeimage on the
-            // module path since they don't have those modules as part of the JDK. Note
-            // that graal-sdk is now obsolete after the split in GR-43819 (#7171)
+            // Non-jlinked JDKs need truffle and graal-sdk on the module path since they
+            // don't have those modules as part of the JDK.
             if (libJvmciDir != null) {
-                result.addAll(getJars(libJvmciDir, "enterprise-graal"));
-                result.addAll(getJars(libJvmciDir, "word", "collections", "nativeimage"));
+                result.addAll(getJars(libJvmciDir, "graal-sdk", "enterprise-graal"));
             }
             if (modulePathBuild) {
                 result.addAll(createTruffleBuilderModulePath());
@@ -576,35 +574,18 @@ public class NativeImage {
         }
 
         private List<Path> createTruffleBuilderModulePath() {
-            Path libTruffleDir = rootDir.resolve(Paths.get("lib", "truffle"));
-            List<Path> jars = getJars(libTruffleDir, "truffle-api", "truffle-runtime", "truffle-enterprise");
+            List<Path> jars = getJars(rootDir.resolve(Paths.get("lib", "truffle")), "truffle-api", "truffle-runtime", "truffle-enterprise");
             if (!jars.isEmpty()) {
                 /*
                  * If Truffle is installed as part of the JDK we always add the builder modules of
                  * Truffle to the builder module path. This is legacy support and should in the
                  * future no longer be needed.
                  */
-                jars.addAll(getJars(libTruffleDir, "truffle-compiler"));
+                jars.addAll(getJars(rootDir.resolve(Paths.get("lib", "truffle")), "truffle-compiler"));
                 Path builderPath = rootDir.resolve(Paths.get("lib", "truffle", "builder"));
                 if (Files.exists(builderPath)) {
                     jars.addAll(getJars(builderPath, "truffle-runtime-svm", "truffle-enterprise-svm"));
-                    if (libJvmciDir != null) {
-                        // truffle-runtime-svm depends on polyglot, which is not part of non-jlinked
-                        // JDKs
-                        jars.addAll(getJars(libJvmciDir, "polyglot"));
-                    }
                 }
-                if (libJvmciDir != null) {
-                    // truffle-runtime depends on polyglot, which is not part of non-jlinked JDKs
-                    jars.addAll(getJars(libTruffleDir, "jniutils"));
-                }
-            }
-            /*
-             * Non-Jlinked JDKs don't have truffle-compiler as part of the JDK, however the native
-             * image builder still needs it
-             */
-            if (libJvmciDir != null) {
-                jars.addAll(getJars(libTruffleDir, "truffle-compiler"));
             }
 
             return jars;
@@ -1563,8 +1544,7 @@ public class NativeImage {
         Function<Path, Path> substituteModulePath = useBundle() ? bundleSupport::substituteModulePath : Function.identity();
         List<Path> substitutedImageModulePath = imagemp.stream().map(substituteModulePath).toList();
 
-        List<String> mainClassArg = config.getGeneratorMainClass();
-        Map<String, Path> modules = listModulesFromPath(javaExecutable, javaArgs, mainClassArg, mp.stream().distinct().toList(), imagemp.stream().distinct().toList());
+        Map<String, Path> modules = listModulesFromPath(javaExecutable, Stream.concat(mp.stream(), imagemp.stream()).distinct().toList());
         if (!addModules.isEmpty()) {
 
             arguments.add("-D" + ModuleSupport.PROPERTY_IMAGE_EXPLICITLY_ADDED_MODULES + "=" +
@@ -1584,7 +1564,7 @@ public class NativeImage {
             }
         }
 
-        arguments.addAll(mainClassArg);
+        arguments.addAll(config.getGeneratorMainClass());
 
         Path keepAliveFile;
         if (OS.getCurrent().hasProcFS) {
@@ -1747,41 +1727,33 @@ public class NativeImage {
     /**
      * Resolves and lists all modules given a module path.
      *
-     * @see #callListModules(String, List, List, List, List)
+     * @see #callListModules(String, List)
      */
-    private Map<String, Path> listModulesFromPath(String javaExecutable, List<String> javaArgs, List<String> mainClassArg, List<Path> modulePath, List<Path> imagemp) {
+    private Map<String, Path> listModulesFromPath(String javaExecutable, Collection<Path> modulePath) {
         if (modulePath.isEmpty() || !config.modulePathBuild) {
             return Map.of();
         }
         String modulePathEntries = modulePath.stream()
                         .map(Path::toString)
                         .collect(Collectors.joining(File.pathSeparator));
-        String imagePathEntries = imagemp.stream()
-                        .map(Path::toString)
-                        .collect(Collectors.joining(File.pathSeparator));
-        List<String> imagempArgs = List.of("-imagemp", imagePathEntries);
-        List<String> modulePathArgs = List.of("--module-path", modulePathEntries);
-        return callListModules(javaExecutable, javaArgs, mainClassArg, imagempArgs, modulePathArgs);
+        return callListModules(javaExecutable, List.of("-p", modulePathEntries));
     }
 
     /**
-     * Calls the image generator's <code>--list-modules</code> to list all modules and parses the
-     * output. The output consists of a map with module name as key and {@link Path} to jar file if
-     * the module is not installed as part of the JDK. If the module is installed as part of the
+     * Calls <code>java $arguments --list-modules</code> to list all modules and parse the output.
+     * The output consists of a map with module name as key and {@link Path} to jar file if the
+     * module is not installed as part of the JDK. If the module is installed as part of the
      * jdk/boot-layer then a <code>null</code> path will be returned.
      * <p>
      * This is a much more robust solution then trying to parse the JDK file structure manually.
      */
-    private static Map<String, Path> callListModules(String javaExecutable, List<String> javaArgs, List<String> mainClassArg, List<String> imagempArgs, List<String> modulePathArgs) {
+    private static Map<String, Path> callListModules(String javaExecutable, List<String> arguments) {
         Process listModulesProcess = null;
         Map<String, Path> result = new LinkedHashMap<>();
         try {
             var pb = new ProcessBuilder(javaExecutable);
-            pb.command().addAll(javaArgs);
-            pb.command().addAll(modulePathArgs);
-            pb.command().addAll(mainClassArg);
-            pb.command().addAll(imagempArgs);
-            pb.command().add("-H:+ListModules");
+            pb.command().addAll(arguments);
+            pb.command().add("--list-modules");
             pb.environment().clear();
             listModulesProcess = pb.start();
 
@@ -1798,10 +1770,8 @@ public class NativeImage {
                 String[] splitModuleNameAndVersion = StringUtil.split(splitString[0], "@", 2);
                 Path externalPath = null;
                 if (splitString.length > 1) {
-                    String pathURI = splitString[1].trim(); // url: file://path/to/file
-                    if (pathURI.startsWith("file://")) {
-                        externalPath = Path.of(URI.create(pathURI)).toAbsolutePath();
-                    }
+                    String pathURI = splitString[1]; // url: file://path/to/file
+                    externalPath = Path.of(URI.create(pathURI)).toAbsolutePath();
                 }
                 result.put(splitModuleNameAndVersion[0], externalPath);
             }
