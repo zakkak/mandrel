@@ -312,6 +312,7 @@ public abstract class VMThreads {
         return attachThread(thread);
     }
 
+    /* Needs to be protected due to legacy code. */
     @Uninterruptible(reason = "Thread is not attached yet.")
     protected int attachThread(IsolateThread thread) {
         assert StatusSupport.isStatusCreated(thread) : "Status should be initialized on creation.";
@@ -328,6 +329,11 @@ public abstract class VMThreads {
             head = thread;
             numAttachedThreads++;
             assert numAttachedThreads > 0;
+
+            if (!wasStartedByCurrentIsolate(thread)) {
+                /* Treat attached threads as non-daemon threads until we know better. */
+                PlatformThreads.incrementNonDaemonThreads();
+            }
 
             Heap.getHeap().attachThread(CurrentIsolate.getCurrentThread());
             /* On the initial transition to java code this thread should be synchronized. */
@@ -349,9 +355,11 @@ public abstract class VMThreads {
         assert thread.equal(CurrentIsolate.getCurrentThread()) : "Cannot detach different thread with this method";
 
         // read thread local data (can't be accessed further below as the IsolateThread is freed)
+        OSThreadHandle threadHandle = OSThreadHandleTL.get(thread);
         OSThreadHandle nextOsThreadToCleanup = WordFactory.nullPointer();
-        if (wasStartedByCurrentIsolate(thread)) {
-            nextOsThreadToCleanup = OSThreadHandleTL.get(thread);
+        boolean wasStartedByCurrentIsolate = wasStartedByCurrentIsolate(thread);
+        if (wasStartedByCurrentIsolate) {
+            nextOsThreadToCleanup = threadHandle;
         }
 
         threadExit(thread);
@@ -388,6 +396,10 @@ public abstract class VMThreads {
             THREAD_MUTEX.unlockNoTransitionUnspecifiedOwner();
         }
 
+        if (!wasStartedByCurrentIsolate) {
+            /* If a thread was attached, we need to free its thread handle. */
+            PlatformThreads.singleton().closeOSThreadHandle(threadHandle);
+        }
         cleanupExitedOsThread(threadToCleanup);
     }
 
@@ -633,21 +645,26 @@ public abstract class VMThreads {
     }
 
     public static boolean printLocationInfo(Log log, UnsignedWord value, boolean allowUnsafeOperations) {
+        if (!allowUnsafeOperations && !VMOperation.isInProgressAtSafepoint()) {
+            /*
+             * Iterating the threads or accessing thread locals of other threads is unsafe if we are
+             * outside a VM operation because the IsolateThread data structure could be freed at any
+             * time (we can't use any locking to prevent races).
+             */
+            return false;
+        }
+
         for (IsolateThread thread = firstThreadUnsafe(); thread.isNonNull(); thread = nextThread(thread)) {
             if (thread.equal(value)) {
                 log.string("is a thread");
                 return true;
             }
 
-            if (allowUnsafeOperations || VMOperation.isInProgressAtSafepoint()) {
-                // If we are not at a safepoint, then it is unsafe to access thread locals of
-                // another thread as the IsolateThread could be freed at any time.
-                UnsignedWord stackBase = StackBase.get(thread);
-                UnsignedWord stackEnd = StackEnd.get(thread);
-                if (value.belowThan(stackBase) && value.aboveOrEqual(stackEnd)) {
-                    log.string("points into the stack for thread ").zhex(thread);
-                    return true;
-                }
+            UnsignedWord stackBase = StackBase.get(thread);
+            UnsignedWord stackEnd = StackEnd.get(thread);
+            if (value.belowThan(stackBase) && value.aboveOrEqual(stackEnd)) {
+                log.string("points into the stack for thread ").zhex(thread);
+                return true;
             }
 
             if (SubstrateOptions.MultiThreaded.getValue()) {

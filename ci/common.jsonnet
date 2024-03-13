@@ -15,12 +15,6 @@ local common_json = import "../common.json";
     [name]: common_json.jdks[name] + { jdk_version:: 17 }
     for name in ["oraclejdk17"] + variants("labsjdk-ce-17") + variants("labsjdk-ee-17")
   } + {
-    [name]: common_json.jdks[name] + { jdk_version:: 19 }
-    for name in ["oraclejdk19"] + variants("labsjdk-ce-19") + variants("labsjdk-ee-19")
-  } + {
-    [name]: common_json.jdks[name] + { jdk_version:: 20 }
-    for name in ["oraclejdk20"] + variants("labsjdk-ce-20") + variants("labsjdk-ee-20")
-  } + {
     [name]: common_json.jdks[name] + { jdk_version:: 21 }
     for name in ["oraclejdk21"] + variants("labsjdk-ce-21") + variants("labsjdk-ee-21")
   } + {
@@ -43,11 +37,6 @@ local common_json = import "../common.json";
     for name in std.objectFields(jdks_data)
   } + {
     # Some convenient JDK aliases which don't require ["name"] for frequently-used JDKs
-    labsjdk17ce: self["labsjdk-ce-17"],
-    labsjdk17ee: self["labsjdk-ee-17"],
-
-    labsjdk20ce: self["labsjdk-ce-20"],
-    labsjdk20ee: self["labsjdk-ee-20"],
 
     labsjdkLatestCE: self["labsjdk-ce-21"],
     labsjdkLatestEE: self["labsjdk-ee-21"],
@@ -58,7 +47,7 @@ local common_json = import "../common.json";
     "windows-jdk17": { packages+: { "devkit:VS2022-17.1.0+1": "==0" }},
     "windows-jdk19": { packages+: { "devkit:VS2022-17.1.0+1": "==0" }},
     "windows-jdk20": { packages+: { "devkit:VS2022-17.1.0+1": "==0" }},
-    "windows-jdk21": { packages+: { "devkit:VS2022-17.1.0+1": "==1" }},
+    "windows-jdk21": { packages+: { "devkit:VS2022-17.6.5+1": "==0" }},
     "windows-jdk22": { packages+: { "devkit:VS2022-17.1.0+1": "==1" }},
     "linux-jdk17": { packages+: { "devkit:gcc11.2.0-OL6.4+1": "==0" }},
     "linux-jdk19": { packages+: { "devkit:gcc11.2.0-OL6.4+1": "==0" }},
@@ -264,7 +253,8 @@ local common_json = import "../common.json";
   },
 
   local linux   = deps_linux   + common + { os:: "linux",   capabilities+: [self.os] },
-  local darwin  = deps_darwin  + common + { os:: "darwin",  capabilities+: [self.os] },
+  # Run darwin jobs on Big Sur or later by excluding all older versions
+  local darwin  = deps_darwin  + common + { os:: "darwin",  capabilities+: [self.os, "!darwin_sierra", "!darwin_mojave", "!darwin_catalina"] },
   local windows = deps_windows + common + { os:: "windows", capabilities+: [self.os] },
   local windows_server_2016 = windows + { capabilities+: ["windows_server_2016"] },
 

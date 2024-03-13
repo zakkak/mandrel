@@ -256,7 +256,7 @@ public final class JavaStackWalker {
     @Uninterruptible(reason = "Not really uninterruptible, but we are about to fatally fail.", calleeMustBe = false)
     public static RuntimeException reportUnknownFrameEncountered(Pointer sp, CodePointer ip, DeoptimizedFrame deoptFrame) {
         Log log = Log.log().string("Stack walk must walk only frames of known code:");
-        log.string("  sp=").hex(sp).string("  ip=").hex(ip);
+        log.string("  sp=").zhex(sp).string("  ip=").zhex(ip);
         if (DeoptimizationSupport.enabled()) {
             log.string("  deoptFrame=").object(deoptFrame);
         }
@@ -304,6 +304,7 @@ public final class JavaStackWalker {
 
     @Uninterruptible(reason = "Prevent deoptimization of stack frames while in this method.")
     public static boolean walkThread(IsolateThread thread, Pointer endSP, ParameterizedStackFrameVisitor visitor, Object data) {
+        assert thread.isNonNull();
         JavaStackWalk walk = StackValue.get(JavaStackWalk.class);
         if (initWalk(walk, thread)) {
             walk.setEndSP(endSP);
