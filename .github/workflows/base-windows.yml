@@ -234,7 +234,7 @@ jobs:
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel build
       if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' #&& inputs.builder-image == 'null'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
@@ -294,7 +294,7 @@ jobs:
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist GraalVM CE build
       if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm' #&& inputs.builder-image == 'null'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
@@ -335,7 +335,7 @@ jobs:
       run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel or GraalVM
       if: fromJson(needs.build-vars.outputs.build-from-source) == false
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
@@ -386,7 +386,7 @@ jobs:
       shell: bash
       run: tar -I 'pigz -9' -cf maven-repo.tgz -C ~ .m2/repository
     - name: Persist Maven Repo
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: win-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: maven-repo.tgz
@@ -420,7 +420,7 @@ jobs:
           path: workflow-mandrel
       - name: Download Maven Repo
         if: startsWith(matrix.os-name, 'windows')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: win-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: .
@@ -449,7 +449,7 @@ jobs:
           java-version: '17'
       - name: Download Mandrel or GraalVM
         if: startsWith(matrix.os-name, 'windows')
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: .
@@ -511,7 +511,7 @@ jobs:
         shell: bash
         run: find . -type d -name '*-reports' -o -wholename '*/build/reports/tests/functionalTest' | tar czvf test-reports.tgz -T -
       - name: Upload failure Archive (if maven failed)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: win-test-reports-native-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
@@ -522,7 +522,7 @@ jobs:
         run: find . -name '*runner*.json' | tar czvf build-stats.tgz -T -
       - name: Upload build JSON stats
         if: ${{ always() && inputs.build-stats-tag != 'null' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: 'build-stats.tgz'
@@ -543,7 +543,7 @@ jobs:
           repository: graalvm/mandrel
           fetch-depth: 1
           path: workflow-mandrel
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: .
@@ -587,7 +587,7 @@ jobs:
           repository: Karm/mandrel-integration-tests
           fetch-depth: 1
       - name: Download Maven Repo
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: win-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: .
@@ -600,7 +600,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Download Mandrel or GraalVM
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: .
@@ -648,7 +648,7 @@ jobs:
         shell: bash
         run: tar czvf test-reports-mandrel-it.tgz ./testsuite/target/archived-logs/
       - name: Upload failure Archive (if maven failed)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: win-test-reports-mandrel-it-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
