@@ -54,7 +54,7 @@ import com.oracle.svm.core.util.VMError;
 
 /**
  * Support to access system Java modules and the <b>jrt://</b> file system.
- * 
+ *
  * <p>
  * <b>javac</b> and other tools that access the system modules, depend on the
  * <b>-Djava.home=/path/to/jdk</b> property to be set e.g. required by
@@ -189,6 +189,7 @@ final class Target_jdk_internal_jimage_BasicImageReader {
 @TargetClass(className = "jdk.internal.jimage.NativeImageBuffer")
 @Substitute
 final class Target_jdk_internal_jimage_NativeImageBuffer {
+    @SuppressWarnings("unused")
     @Substitute
     static ByteBuffer getNativeMap(String imagePath) {
         throw VMError.unsupportedFeature("Using jdk.internal.jimage.NativeImageBuffer is not supported");

@@ -35,6 +35,7 @@ import org.graalvm.nativeimage.Platforms;
 import org.graalvm.nativeimage.VMRuntime;
 import org.graalvm.nativeimage.impl.VMRuntimeSupport;
 
+import com.oracle.svm.core.IsolateArgumentParser;
 import com.oracle.svm.core.Isolates;
 import com.oracle.svm.core.feature.AutomaticallyRegisteredImageSingleton;
 import com.oracle.svm.core.heap.HeapSizeVerifier;
@@ -93,6 +94,7 @@ public final class RuntimeSupport implements VMRuntimeSupport {
         boolean shouldInitialize = initializationState.compareAndSet(InitializationState.Uninitialized, InitializationState.InProgress);
         if (shouldInitialize) {
             // GR-35186: we should verify that none of the early parsed isolate arguments changed.
+            IsolateArgumentParser.verifyOptionValues();
             HeapSizeVerifier.verifyHeapOptions();
 
             executeHooks(startupHooks);
@@ -126,7 +128,7 @@ public final class RuntimeSupport implements VMRuntimeSupport {
 
     /**
      * Adds a hook which will execute during isolate tear-down. Note it is possible for the
-     * {@link #tearDownHooks} to called without the {@link #initializationHooks} executing first.
+     * {@link #tearDownHooks} to be called without the {@link #initializationHooks} executing first.
      */
     public void addTearDownHook(Hook tearDownHook) {
         addHook(tearDownHooks, tearDownHook);
