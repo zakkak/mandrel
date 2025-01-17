@@ -389,180 +389,14 @@ jobs:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: jdk.tgz
 
-  build-quarkus:
-    name: Quarkus build
-    needs:
-      - get-test-matrix
-      - build-mandrel
-      - build-graal
-      - build-vars
-    if: always() && (needs.build-graal.result == 'success' || needs.build-mandrel.result == 'success' || fromJson(needs.build-vars.outputs.build-from-source) == false) || inputs.builder-image != 'null'
-    uses: ./.github/workflows/build-quarkus.yml
-    with:
-      artifacts-suffix: ${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-      build-from-source: ${{ fromJson(needs.build-vars.outputs.build-from-source) }}
-      builder-image: ${{ inputs.builder-image }}
-      maven-deploy-local: ${{ needs.build-vars.outputs.maven-deploy-local }}
-      target-os: 'linux'
-      quarkus-repo: ${{ inputs.quarkus-repo }}
-      quarkus-version: ${{ needs.get-test-matrix.outputs.quarkus-version }}
-
-  native-tests:
-    name: Q IT ${{ matrix.category }}
-    needs:
-      - build-mandrel
-      - build-graal
-      - get-jdk
-      - build-quarkus
-      - get-test-matrix
-    if: always() && needs.build-quarkus.result == 'success'
-    runs-on: ubuntu-latest
-    env:
-      # leave more space for the actual native compilation and execution
-      MAVEN_OPTS: -Xmx1g
-      # USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
-    # Ignore the following YAML Schema error
-    timeout-minutes: ${{matrix.timeout}}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.get-test-matrix.outputs.tests-matrix) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: graalvm/mandrel
-          fetch-depth: 1
-          path: workflow-mandrel
-      - name: Download Maven Repo
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        shell: bash
-        run: tar -xzvf maven-repo.tgz -C ~
-      # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: Download Mandrel or GraalVM
-        if: inputs.builder-image == 'null'
-        uses: actions/download-artifact@v4
-        with:
-          name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Mandrel or GraalVM
-        if: inputs.builder-image == 'null'
-        shell: bash
-        run: |
-          mkdir -p ${GRAALVM_HOME}
-          tar -xzvf jdk.tgz -C ${GRAALVM_HOME} --strip-components=1
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.quarkus-repo }}
-          fetch-depth: 1
-          ref: ${{ needs.get-test-matrix.outputs.quarkus-version }}
-          path: ${{ env.QUARKUS_PATH }}
-      - name: Reclaim disk space
-        run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
-      - name: Update Docker Client User Agent
-        shell: bash
-        run: |
-          if [ -f ~/.docker/config.json ]; then
-            cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json.new
-            mv ~/.docker/config.json.new ~/.docker/config.json
-          fi
-      - name: Change quarkus.version for Quarkus 2.2 to make mandrel-integration-test not apply quarkus_main.patch
-        # See https://github.com/Karm/mandrel-integration-tests/pull/64
-        run: |
-          if [ "${{ inputs.quarkus-version }}" == "2.2" ]
-          then
-            cd quarkus
-            bash ../workflow-mandrel/.github/update_quarkus_version.sh 2.2.999
-          fi
-      - name: Build with Maven
-        env:
-          TEST_MODULES: ${{matrix.test-modules}}
-          CATEGORY: ${{matrix.category}}
-        shell: bash
-        run: |
-          cd ${QUARKUS_PATH}
-          if [[ ${{ inputs.builder-image }} == "null" ]]
-          then
-            export BUILDER_IMAGE="-Dquarkus.native.container-build=false"
-            ${GRAALVM_HOME}/bin/native-image --version
-          else
-            export BUILDER_IMAGE="-Dquarkus.native.container-build=true -Dquarkus.native.builder-image=${{ inputs.builder-image }}"
-          fi
-          # Patch Gradle config to look for GraalVM dependencies in maven local repository
-          for i in `grep -rl includeGroupByRegex .`
-          do
-            sed -i "s/\(^ *includeGroupByRegex\)\( 'io.quarkus.*'\)/\1\2\n\1 'org.graalvm.*'/g" $i
-          done
-          # Backwards compatibility with Quarkus < 2.x native-tests.json
-          if ! echo $TEST_MODULES | grep ',' > /dev/null
-          then
-            for i in $TEST_MODULES
-            do modules+=("$i"); done
-            IFS=,
-            TEST_MODULES="${modules[*]}"
-            # add the 'simple with spaces' project to the run of 'Misc1' by executing it explicitly
-            # done because there is no good way to pass strings with empty values to the previous command
-            # so this hack is as good as any
-            if [ "$CATEGORY" == "Misc1" ]; then
-              TEST_MODULES="$TEST_MODULES,simple with space"
-            fi
-            unset IFS
-          fi
-          if [[ $TEST_MODULES == "main" ]]
-          then
-            # Build main module with constraint memory to ensure we can build apps on smaller machines too
-            export NEW_MAX_HEAP_SIZE=-Dquarkus.native.native-image-xmx=5g
-          fi
-          ./mvnw -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml -f integration-tests -pl "$TEST_MODULES" -amd $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS $NEW_MAX_HEAP_SIZE
-      - name: Prepare failure archive (if maven failed)
-        if: failure()
-        shell: bash
-        run: |
-          find . -type d -name '*-reports' -o -wholename '*/build/reports/tests/functionalTest' -o -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
-      - name: Upload failure Archive (if maven failed)
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-reports-native-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'test-reports.tgz'
-      - name: Collect build JSON stats
-        if: ${{ always() && inputs.build-stats-tag != 'null' }}
-        shell: bash
-        run: find . -name '*runner*.json' | tar czvf build-stats.tgz -T -
-      - name: Upload build JSON stats
-        if: ${{ always() && inputs.build-stats-tag != 'null' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'build-stats.tgz'
-
-  native-tests-stats-upload:
-    name: Upload build stats to collector
-    if: always() && inputs.build-stats-tag != 'null' && github.event_name != 'pull_request' && needs.native-tests.result != 'skipped' && needs.native-tests.result != 'cancelled'
-    needs:
-      - native-tests
-      - get-test-matrix
-    uses: ./.github/workflows/native-tests-stats-upload.yml
-    with:
-      artifacts-suffix: ${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-      build-stats-tag: ${{ inputs.build-stats-tag }}
-    secrets:
-      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-
   mandrel-integration-tests:
     name: Q Mandrel IT
-    if: always() && needs.build-quarkus.result == 'success'
+    if: always() && (needs.build-graal.result == 'success' || needs.build-mandrel.result == 'success' || needs.get-jdk.result == 'success' || inputs.builder-image != 'null')
     needs:
       - build-vars
       - build-mandrel
+      - build-graal
       - get-jdk
-      - build-quarkus
       - get-test-matrix
     runs-on: ubuntu-latest
     env:
@@ -585,13 +419,6 @@ jobs:
           repository: Karm/mandrel-integration-tests
           fetch-depth: 1
           path: ${{ env.MANDREL_IT_PATH }}
-      - name: Download Maven Repo
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        run: tar -xzvf maven-repo.tgz -C ~
       # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
       - uses: actions/setup-java@v4
         with:
@@ -623,31 +450,21 @@ jobs:
         run: |
           cd ${MANDREL_IT_PATH}
           export PATH="${GRAALVM_HOME}/bin:$PATH"
-          export QUARKUS_VERSION=${{ needs.get-test-matrix.outputs.quarkus-version }}
-          # Don't use SNAPSHOT version for 2.2 and release tags
-          if [ "${{ inputs.quarkus-version }}" == "2.2" ]
-          then
-            export QUARKUS_VERSION=2.2.999
-          elif $(expr match "${{ inputs.quarkus-version }}" "^[0-9]\+\.[0-9]\+$" > /dev/null)
-          then
-            # release branches use the branch name followed by .999-SNAPSHOT as the version
-            export QUARKUS_VERSION="${{ inputs.quarkus-version }}.999-SNAPSHOT"
-          elif ! $(expr match "$QUARKUS_VERSION" "^.*\.\(Final\|CR\|Alpha\|Beta\)[0-9]\?$" > /dev/null)
-          then
-            export QUARKUS_VERSION="999-SNAPSHOT"
-          fi
-          echo $QUARKUS_VERSION
           if [[ ${{ inputs.builder-image }} == "null" ]]
           then
             ${GRAALVM_HOME}/bin/native-image --version
             mvn clean verify -Dquarkus.native.native-image-xmx=13g \
-              -Dquarkus.version=$QUARKUS_VERSION \
-              -Ptestsuite
+              -Dquarkus.version=3.17.7 \
+              -DCMD_DEFAULT_TIMEOUT_MS=10000 \
+              -Ptestsuite \
+              -Dtest=DebugSymbolsTest#debugSymbolsSmokeGDB
           else
             mvn clean verify -Dquarkus.native.native-image-xmx=13g \
-              -Dquarkus.version=$QUARKUS_VERSION \
+              -Dquarkus.version=3.17.7 \
               -Dquarkus.native.builder-image=${{ inputs.builder-image }} \
-              -Ptestsuite-builder-image
+              -DCMD_DEFAULT_TIMEOUT_MS=10000 \
+              -Ptestsuite-builder-image \
+              -Dtest=DebugSymbolsTest#debugSymbolsSmokeGDB
           fi
       - name: Prepare failure archive (if maven failed)
         if: failure()

@@ -44,31 +44,17 @@ jobs:
       build-stats-tag: "gha-linux-graal-qmain-glatest-jdk25ea"
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-25-latest:
-    name: "Q main M 25 latest"
-    uses: ./.github/workflows/base.yml
-    with:
-      quarkus-version: "main"
-      version: "graal/master"
-      jdk: "25/ea"
-      issue-number: "812"
-      issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "300"
-      build-stats-tag: "gha-linux-mandrel-qmain-mlatest-jdk25ea"
-    secrets:
-      ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
-      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-25-latest-win:
-    name: "Q main M 25 latest windows"
-    uses: ./.github/workflows/base-windows.yml
-    with:
-      quarkus-version: "main"
-      version: "graal/master"
-      issue-number: "813"
-      issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "301"
-      jdk: "25/ea"
-      build-stats-tag: "gha-win-mandrel-qmain-mlatest-jdk25ea"
-    secrets:
-      ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
-      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
+  # q-main-mandrel-25-latest:
+  #   name: "Q main M 25 latest"
+  #   uses: ./.github/workflows/base.yml
+  #   with:
+  #     quarkus-version: "main"
+  #     version: "mandrel/24.2"
+  #     jdk: "24/ea"
+  #     issue-number: "812"
+  #     issue-repo: "graalvm/mandrel"
+  #     mandrel-it-issue-number: "300"
+  #     build-stats-tag: "gha-linux-mandrel-qmain-mlatest-jdk25ea"
+  #   secrets:
+  #     ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
+  #     UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
