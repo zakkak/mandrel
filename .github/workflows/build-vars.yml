@@ -1,0 +1,71 @@
+name: Generate build variables
+
+on:
+  workflow_call:
+    inputs:
+      build-type:
+        type: string
+        description: 'Build distribution (Mandrel/GraalVM) from source or grab a release, and control of maven should deploy locally'
+        default: "mandrel-source"
+    outputs:
+      build-from-source:
+        value: ${{ jobs.build-vars.outputs.build-from-source }}
+      distribution:
+        value: ${{ jobs.build-vars.outputs.distribution }}
+      maven-deploy-local:
+        value: ${{ jobs.build-vars.outputs.maven-deploy-local }}
+
+jobs:
+  build-vars:
+    name: Set distribution, build-from-source, and maven-deploy-local variables based on build-type
+    runs-on: ubuntu-latest
+    outputs:
+      build-from-source: ${{ steps.source-build.outputs.build-from-source }}
+      distribution: ${{ steps.distro.outputs.distribution }}
+      maven-deploy-local: ${{ steps.maven-deploy-local.outputs.maven-deploy-local }}
+    steps:
+    - name: Set build-from-source output
+      id: source-build
+      run: |
+        echo "${{ inputs.build-type }}"
+        bfs_token=$(echo ${{ inputs.build-type }} | cut -d'-' -f2)
+        if [ "${bfs_token}" == "release" ]
+        then
+          source_build=false
+        elif [ "${bfs_token}" == "source" ]
+        then
+          source_build=true
+        else
+          echo "Unexpected input 'build-type' = ${{ inputs.build-type }}"
+          exit 1
+        fi
+        echo "source_build=$source_build"
+        echo "build-from-source=$source_build" >> $GITHUB_OUTPUT
+    - name: Set distribution output
+      id: distro
+      run: |
+        bfs_token=$(echo ${{ inputs.build-type }} | cut -d'-' -f1)
+        if [ "${bfs_token}" == "graal" ]
+        then
+          distro="graalvm"
+        elif [ "${bfs_token}" == "mandrel" ]
+        then
+          distro="mandrel"
+        else
+          echo "Unexpected input 'build-type' = ${{ inputs.build-type }}"
+          exit 1
+        fi
+        echo "distro=$distro"
+        echo "distribution=$distro" >> $GITHUB_OUTPUT
+    - name: Set maven-deploy-local output
+      id: maven-deploy-local
+      run: |
+        bfs_token=$(echo ${{ inputs.build-type }} | cut -d'-' -f3)
+        if [ "${bfs_token}" == "nolocalmvn" ]
+        then
+          maven_deploy_local=""
+        else
+          maven_deploy_local="--maven-deploy-local"
+        fi
+        echo "maven_deploy_local=$maven_deploy_local"
+        echo "maven-deploy-local=$maven_deploy_local" >> $GITHUB_OUTPUT

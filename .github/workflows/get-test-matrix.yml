@@ -1,0 +1,62 @@
+name: Generate build variables
+
+on:
+  workflow_call:
+    inputs:
+      quarkus-version:
+        type: string
+        description: 'Quarkus version to test (branch, tag, commit, or "latest")'
+        # "latest" is replaced by the latest release available in maven
+        default: "main"
+      quarkus-repo:
+        type: string
+        description: 'The Quarkus repository to be used'
+        default: 'quarkusio/quarkus'
+      os:
+        type: string
+        description: 'The operating system we are building for (ubuntu or windows)'
+        default: 'ubuntu'
+    outputs:
+      quarkus-version:
+        value: ${{ jobs.get-test-matrix.outputs.quarkus-version }}
+      tests-matrix:
+        value: ${{ jobs.get-test-matrix.outputs.tests-matrix }}
+      artifacts-suffix:
+        value: ${{ jobs.get-test-matrix.outputs.artifacts-suffix }}
+
+jobs:
+  get-test-matrix:
+    name: Get test matrix
+    runs-on: ubuntu-latest
+    outputs:
+      quarkus-version: ${{ steps.version.outputs.quarkus-version }}
+      tests-matrix: ${{ steps.version.outputs.tests-matrix }}
+      artifacts-suffix: ${{ steps.suffix.outputs.suffix }}
+    steps:
+    - id: suffix
+      run: |
+        export SUFFIX=$(echo '${{ toJson(inputs) }}' | jq -j 'del(."build-stats-tag", ."mandrel-it-issue-number", ."issue-repo", ."issue-number") | to_entries[] | "-\(.value)"' | tr '":<>|*?\r\n\/' '-')
+        echo $SUFFIX
+        echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
+    - name: Get Quarkus version and test matrix
+      id: version
+      run: |
+        if [ ${{ inputs.quarkus-version }} == "latest" ]
+        then
+          export QUARKUS_VERSION=$(curl -s https://repo1.maven.org/maven2/io/quarkus/quarkus-bom/maven-metadata.xml | awk -F"[<>]" '/Final/ {print $3}' | sort -V | tail -n 1)
+        elif $(expr match "${{ inputs.quarkus-version }}" "^.*\.\(Final\|CR\|Alpha\|Beta\)[0-9]\?$" > /dev/null)
+        then
+          export QUARKUS_VERSION=${{ inputs.quarkus-version }}
+        else
+          export QUARKUS_VERSION=$(git ls-remote ${GITHUB_SERVER_URL}/${{ inputs.quarkus-repo }} | grep "refs/heads/${{ inputs.quarkus-version }}$\|refs/tags/${{ inputs.quarkus-version }}$" | cut -f 1)
+        fi
+        if [ "$QUARKUS_VERSION" == "" ]
+        then
+          export QUARKUS_VERSION=${{ inputs.quarkus-version }}
+        fi
+        echo ${QUARKUS_VERSION}
+        echo "quarkus-version=${QUARKUS_VERSION}" >> $GITHUB_OUTPUT
+        curl --output native-tests.json https://raw.githubusercontent.com/${{ inputs.quarkus-repo }}/${QUARKUS_VERSION}/.github/native-tests.json
+        tests_json=$(jq -c '.include |= map(select(.["os-name"] | startswith("${{ inputs.os }}")))' native-tests.json)
+        echo ${tests_json}
+        echo "tests-matrix=${tests_json}" >> $GITHUB_OUTPUT
