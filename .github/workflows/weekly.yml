@@ -49,7 +49,7 @@ jobs:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   q-main-mandrel-24_2-ea-win:
-    name: "Q main M 24.2 JDK 23 EA windows"
+    name: "Q main M 24.2 JDK 24 EA windows"
     uses: ./.github/workflows/base-windows.yml
     with:
       quarkus-version: "main"
