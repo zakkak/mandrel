@@ -41,7 +41,7 @@
 suite = {
   "mxversion": "7.33.0",
   "name" : "truffle",
-  "version" : "25.0.0",
+  "version" : "25.0.0.0",
   "release" : True,
   "groupId" : "org.graalvm.truffle",
   "sourceinprojectwhitelist" : [],
