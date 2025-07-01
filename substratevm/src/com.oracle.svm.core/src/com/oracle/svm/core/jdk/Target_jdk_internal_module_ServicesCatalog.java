@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,16 +22,26 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.oracle.svm.core.image;
+package com.oracle.svm.core.jdk;
 
-import java.util.Collection;
+import com.oracle.svm.core.annotate.Alias;
+import com.oracle.svm.core.annotate.RecomputeFieldValue;
+import com.oracle.svm.core.annotate.TargetClass;
+import jdk.internal.loader.ClassLoaderValue;
+import jdk.internal.module.ServicesCatalog;
+import org.graalvm.nativeimage.hosted.FieldValueTransformer;
 
-public interface ImageHeap {
-    Collection<? extends ImageHeapObject> getObjects();
+@SuppressWarnings("unused")
+@TargetClass(value = ServicesCatalog.class)
+final class Target_jdk_internal_module_ServicesCatalog {
 
-    ImageHeapObject addLateToImageHeap(Object object, Object reason);
+    @Alias @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.Custom, declClass = ServicesCatalogCLVTransformer.class, isFinal = true) //
+    static ClassLoaderValue<ServicesCatalog> CLV;
+}
 
-    ImageHeapObject addFillerObject(int size);
-
-    int countAndVerifyDynamicHubs();
+final class ServicesCatalogCLVTransformer implements FieldValueTransformer {
+    @Override
+    public Object transform(Object receiver, Object originalValue) {
+        return originalValue != null ? RuntimeClassLoaderValueSupport.instance().servicesCatalogCLV : null;
+    }
 }

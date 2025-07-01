@@ -41,6 +41,7 @@ import org.graalvm.compiler.nodes.StructuredGraph;
 import org.graalvm.compiler.nodes.ValueNode;
 import org.graalvm.compiler.nodes.extended.BranchProbabilityNode;
 import org.graalvm.compiler.nodes.extended.ForeignCallNode;
+import org.graalvm.compiler.nodes.extended.MembarNode;
 import org.graalvm.compiler.nodes.java.ArrayLengthNode;
 import org.graalvm.compiler.nodes.spi.LoweringTool;
 import org.graalvm.compiler.nodes.spi.VirtualizerTool;
@@ -68,6 +69,7 @@ import com.oracle.svm.core.heap.Pod;
 import com.oracle.svm.core.heap.PodReferenceMapDecoder;
 import com.oracle.svm.core.hub.DynamicHub;
 import com.oracle.svm.core.hub.DynamicHubSupport;
+import com.oracle.svm.core.hub.HubType;
 import com.oracle.svm.core.hub.LayoutEncoding;
 import com.oracle.svm.core.meta.SharedType;
 import com.oracle.svm.core.snippets.KnownIntrinsics;
@@ -90,14 +92,19 @@ public final class SubstrateObjectCloneSnippets extends SubstrateTemplates imple
     }
 
     @SubstrateForeignCallTarget(stubCallingConvention = false)
+    // @BasedOnJDKFile("https://github.com/openjdk/jdk/blob/jdk-21+35/src/hotspot/share/prims/jvm.cpp#L643-L692")
     private static Object doClone(Object original) throws CloneNotSupportedException, InstantiationException {
         if (original == null) {
             throw new NullPointerException();
         } else if (!(original instanceof Cloneable)) {
-            throw new CloneNotSupportedException("Object is no instance of Cloneable.");
+            throw new CloneNotSupportedException("Object is no instance of Cloneable: " + original.getClass().getName());
         }
 
         DynamicHub hub = KnownIntrinsics.readHub(original);
+        if (hub.getHubType() == HubType.REFERENCE_INSTANCE) {
+            throw new CloneNotSupportedException("Subclasses of java.lang.ref.Reference are not cloneable: " + hub.getName());
+        }
+
         int layoutEncoding = hub.getLayoutEncoding();
         boolean isArrayLike = LayoutEncoding.isArrayLike(layoutEncoding);
 
@@ -169,6 +176,12 @@ public final class SubstrateObjectCloneSnippets extends SubstrateTemplates imple
         if (monitorOffset != 0) {
             BarrieredAccess.writeObject(result, monitorOffset, null);
         }
+
+        /*
+         * Emit a STORE_STORE barrier to ensure that other threads see consistent values for final
+         * fields and VM internal fields.
+         */
+        MembarNode.memoryBarrier(MembarNode.FenceKind.STORE_STORE);
 
         return result;
     }
