@@ -311,7 +311,7 @@ jobs:
       with:
         name: graal-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
         path: 'test-reports.tgz'
-  
+
   get-jdk:
     name: Get JDK ${{ inputs.jdk }}
     runs-on: windows-2022
@@ -573,8 +573,9 @@ jobs:
           fi
       - name: Build with Maven
         run: |
-          cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
+          cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat`" x64 && set > %temp%\vcvars64.txt"
           Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
+            Write-Host $_
             if ($_ -match "^(.*?)=(.*)$") {
               Set-Content "Env:\$($matches[1])" $matches[2]
             }
