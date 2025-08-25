@@ -63,7 +63,7 @@ on:
       quarkus-additional-build-args-append:
         type: string
         description: 'Additional arguments to append to the quarkus native build command'
-        default: ''
+        default: '-ea,-esa,-J-ea,-J-esa'
     secrets:
       ISSUE_BOT_TOKEN:
         description: 'A token used to report results in GH issues'
