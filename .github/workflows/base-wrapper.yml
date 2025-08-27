@@ -16,7 +16,7 @@ on:
       graalvm-version:
         type: string
         description: 'Mandrel version to test `<repo>:<version>` (branch, tag, or commit)'
-        default: "graalvm/mandrel:graal/master"
+        default: "graalvm/mandrel:mandrel-23.1.8.0-Final"
       mandrel-packaging-version:
         type: string
         description: 'Mandrel packaging version to test `<repo>:<version>` (branch, tag, or commit)'
@@ -24,7 +24,7 @@ on:
       build-type:
         type: choice
         description: 'Build distribution (graal/mandrel) from source or use released binaries, and control of maven should deploy locally'
-        default: "mandrel-source"
+        default: "mandrel-release"
         options:
           - "mandrel-source"
           - "graal-source"
@@ -55,7 +55,7 @@ on:
       gh-runner:
         type: choice
         description: 'The github runner we are building for'
-        default: "ubuntu-latest"
+        default: "ubuntu-24.04-arm"
         options:
           - "ubuntu-latest"
           - "ubuntu-24.04"
