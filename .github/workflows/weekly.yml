@@ -66,7 +66,7 @@ jobs:
   ####
   # Test Quarkus main with Mandrel for JDK 25 on AArch64
   ####
-  q-main-mandrel-25-latest:
+  q-main-mandrel-25-latest-arm:
     name: "Q main M 25 latest on AArch64"
     uses: ./.github/workflows/base.yml
     with:
