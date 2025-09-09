@@ -32,16 +32,17 @@ jobs:
     uses: graalvm/mandrel/.github/workflows/base.yml@default
     with:
       quarkus-version: "main"
-      repo: ${{ github.repository }}
-      version: ${{ github.ref }}
+      mandrel-version: ${{ github.ref }}
+      mandrel-repo: ${{ github.repository }}
       mandrel-packaging-version: "23.1"
       jdk: "21/ea"
+
   q-main-ea-win:
     name: "Q main M 23.1 windows EA"
     uses: graalvm/mandrel/.github/workflows/base-windows.yml@default
     with:
       quarkus-version: "main"
-      repo: ${{ github.repository }}
-      version: ${{ github.ref }}
+      mandrel-version: ${{ github.ref }}
+      mandrel-repo: ${{ github.repository }}
       mandrel-packaging-version: "23.1"
       jdk: "21/ea"
