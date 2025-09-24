@@ -33,8 +33,8 @@ jobs:
   ####
   # Test Q main and Mandrel 25.0 JDK 25
   ####
-  q-main-mandrel-25-latest:
-    name: "Q main M 25 latest"
+  q-main-mandrel-25_0:
+    name: "Q main M 25.0"
     uses: ./.github/workflows/base.yml
     with:
       quarkus-version: "main"
@@ -48,8 +48,8 @@ jobs:
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
-  q-main-mandrel-25-latest-win:
-    name: "Q main M 25 latest windows"
+  q-main-mandrel-25_0-win:
+    name: "Q main M 25.0 windows"
     uses: ./.github/workflows/base-windows.yml
     with:
       quarkus-version: "main"
@@ -66,8 +66,8 @@ jobs:
   ####
   # Test Quarkus main with Mandrel for JDK 25 on AArch64
   ####
-  q-main-mandrel-25-latest-arm:
-    name: "Q main M 25 latest on AArch64"
+  q-main-mandrel-25_0-arm:
+    name: "Q main M 25.0 on AArch64"
     uses: ./.github/workflows/base.yml
     with:
       quarkus-version: "main"
@@ -85,17 +85,17 @@ jobs:
   ####
   # Test Quarkus main with Mandrel latest on AArch64
   ####
-  q-main-mandrel-26-latest-arm:
-    name: "Q main M 26 latest on AArch64"
+  q-main-mandrel-25-latest-arm:
+    name: "Q main M 25 latest on AArch64"
     uses: ./.github/workflows/base.yml
     with:
       quarkus-version: "main"
       mandrel-version: "graal/master"
-      jdk: "26/ea"
-      issue-number: "872"
+      jdk: "25/ea"
+      issue-number: "886"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "359"
-      build-stats-tag: "gha-linux-aarch64-mandrel-qmain-mlatest-jdk26ea"
+      mandrel-it-issue-number: "368"
+      build-stats-tag: "gha-linux-aarch64-mandrel-qmain-mlatest-jdk25ea"
       gh-runner: "ubuntu-24.04-arm"
     secrets:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
