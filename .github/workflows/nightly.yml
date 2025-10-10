@@ -43,6 +43,7 @@ jobs:
       jdk: "latest/ea"
       build-stats-tag: "gha-linux-graal-qmain-glatest-jdk25ea"
       issue-repo: "graalvm/mandrel"
-      mandrel-it-issue-number: "898"
+      issue-number: "898"
+      mandrel-it-issue-number: "366"
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
