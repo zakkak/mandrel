@@ -42,7 +42,7 @@ suite = {
   "mxversion": "7.54.5",
   "name" : "sdk",
   "version" : "25.0.1.0",
-  "release" : False,
+  "release" : True,
   "sourceinprojectwhitelist" : [],
   "url" : "https://github.com/oracle/graal",
   "groupId" : "org.graalvm.sdk",
@@ -312,6 +312,12 @@ suite = {
     "DACAPO_23.11_MR2_chopin" : {
       "urls" : ["https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/dacapo-23.11-MR2-chopin.zip"],
       "digest" : "sha512:1399c9a743d4a52202372d7a5acef7e5d90181b79194484056cb716ba0284224c9bd7a7620b6db3a7a3c4ccdb8427ee4843fca4d23e37c0b13ada6ce9f041b6f",
+      "packedResource": True,
+    },
+
+    "DACAPO_23.11_MR2_chopin_minimal" : {
+      "urls" : ["https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/dacapo-23.11-MR2-chopin-minimal.zip"],
+      "digest" : "sha512:51c04f81564f758e12c43dc44fc70fe2de15c5ea368e759b898a41bac3a458a421c1dbf557676533ba97c82283055fe73637cdc8c100b82384e5af9380113d40",
       "packedResource": True,
     },
 
