@@ -50,6 +50,10 @@ on:
         type: string
         description: 'The tag to use for build stats uploads of native tests (e.g. 22.3.0-dev-jdk17-prepatch-x)'
         default: "null"
+      quarkus-additional-build-args:
+        type: string
+        description: 'Additional arguments to append to the quarkus native build command'
+        default: ''
 
 jobs:
   process-inputs:
@@ -89,5 +93,6 @@ jobs:
       jdk: ${{ github.event.inputs.jdk }}
       # builder-image: ${{ github.event.inputs.builder-image }}
       build-stats-tag: ${{ github.event.inputs.build-stats-tag }}
+      quarkus-additional-build-args-append: ${{ github.event.inputs.quarkus-additional-build-args }}
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}

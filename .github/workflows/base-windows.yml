@@ -56,6 +56,10 @@ on:
         type: string
         description: 'The tag to use for build stats upload of native tests (e.g. 22.3.0-dev-jdk17-mytest-patch-before)'
         default: "null"
+      quarkus-additional-build-args-append:
+        type: string
+        description: 'Additional arguments to append to the quarkus native build command'
+        default: ''
     secrets:
       ISSUE_BOT_TOKEN:
         description: 'A token used to report results in GH issues'
@@ -72,6 +76,7 @@ env:
   DB_NAME: hibernate_orm_test
   COMMON_MAVEN_ARGS: "-e -B --settings .github/mvn-settings.xml --fail-at-end"
   NATIVE_TEST_MAVEN_OPTS: "-Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dquarkus.native.native-image-xmx=13g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests -DskipDocs"
+  QUARKUS_NATIVE_ADDITIONAL_BUILD_ARGS_APPEND: ${{ inputs.quarkus-additional-build-args-append }}
   MX_GIT_CACHE: refcache
   JAVA_HOME: ${{ github.workspace }}\openjdk
   GRAALVM_HOME: ${{ github.workspace }}\graalvm-home
