@@ -60,6 +60,10 @@ on:
           - "ubuntu-latest"
           - "ubuntu-24.04"
           - "ubuntu-24.04-arm"
+      quarkus-additional-build-args:
+        type: string
+        description: 'Additional arguments to append to the quarkus native build command'
+        default: ''
 
 jobs:
   process-inputs:
@@ -101,5 +105,6 @@ jobs:
       builder-image: ${{ github.event.inputs.builder-image }}
       build-stats-tag: ${{ github.event.inputs.build-stats-tag }}
       gh-runner: ${{ github.event.inputs.gh-runner }}
+      quarkus-additional-build-args-append: ${{ github.event.inputs.quarkus-additional-build-args }}
     secrets:
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
