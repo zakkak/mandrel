@@ -32,6 +32,11 @@ on:
         description: 'Quarkus version to test (branch, tag, commit, or "latest")'
         # "latest" is replaced by the latest release available in maven
         default: "main"
+      gh-runner:
+        type: string
+        description: 'GHA runner to run the build on'
+        # "latest" is replaced by the latest release available in maven
+        default: "ubuntu-latest"
       # Builder image can't be tested on Windows due to https://github.com/actions/virtual-environments/issues/1143
       # builder-image:
       #   description: 'The builder image to use instead of a release or building from source (e.g. quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21)'
@@ -45,7 +50,7 @@ env:
 jobs:
   build-quarkus:
     name: Quarkus build
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.gh-runner }}
     strategy:
       fail-fast: false
     steps:
@@ -63,8 +68,8 @@ jobs:
     - uses: actions/cache@v4
       with:
         path: ~/.m2/repository
-        key: ${{ inputs.target-os }}-${{ inputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ inputs.target-os }}-${{ inputs.quarkus-version }}-maven-
+        key: ${{ inputs.gh-runner }}-${{ inputs.target-os }}-${{ inputs.quarkus-version }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ inputs.gh-runner }}-${{ inputs.target-os }}-${{ inputs.quarkus-version }}-maven-
     - name: Change quarkus.version for Quarkus 2.2 to make mandrel-integration-test not apply quarkus_main.patch
       # See https://github.com/Karm/mandrel-integration-tests/pull/64
       run: |

@@ -481,6 +481,7 @@ jobs:
       target-os: 'linux'
       quarkus-repo: ${{ inputs.quarkus-repo }}
       quarkus-version: ${{ needs.get-test-matrix.outputs.quarkus-version }}
+      gh-runner: ${{ inputs.gh-runner }}
 
   native-tests:
     name: Q IT ${{ matrix.category }}
