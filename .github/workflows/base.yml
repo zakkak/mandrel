@@ -594,9 +594,13 @@ jobs:
             # Build main module with constraint memory to ensure we can build apps on smaller machines too
             export NEW_MAX_HEAP_SIZE=-Dquarkus.native.native-image-xmx=5g
           fi
-          # Remove DB2 module on ARM runners as the dev services fail to run, see https://github.com/quarkusio/quarkus/issues/49717
+          # - Remove DB2 modules on ARM runners as the dev services fail to run.
+          #   See https://github.com/quarkusio/quarkus/issues/49717
+          # - Remove postgresql spatial module on ARM runners as the underlying
+          #   postgis image isn't yet available for ARM. See
+          #   https://github.com/quarkusio/quarkus/issues/51923
           if [[ "${{ runner.arch }}" == "ARM64" ]]; then
-            TEST_MODULES=$(echo $TEST_MODULES | tr ',' '\n' | grep -vi 'db2' | paste -sd, -)
+            TEST_MODULES=$(echo $TEST_MODULES | tr ',' '\n' | grep -vi -E 'db2|hibernate-orm-spatial' | paste -sd, -)
             echo "Filtered TEST_MODULES for ARM: $TEST_MODULES"
           fi
           ./mvnw -B --settings ${QUARKUS_PATH}/.github/mvn-settings.xml -f integration-tests -pl "$TEST_MODULES" -amd $BUILDER_IMAGE $NATIVE_TEST_MAVEN_OPTS $NEW_MAX_HEAP_SIZE
