@@ -83,7 +83,7 @@ jobs:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   ####
-  # Test Q main and Mandrel 25.0 JDK 25
+  # Test Q main and Mandrel 25.0 JDK 25 with --future-defaults=all
   ####
   q-main-mandrel-25_0-future-defaults:
     name: "Q main M 25.0 --future-defaults=all"
@@ -98,6 +98,9 @@ jobs:
       mandrel-packaging-version: "25.0"
       quarkus-additional-build-args-append: "--future-defaults=all"
       build-stats-tag: "gha-linux-mandrel-qmain-m25_0-jdk25ea-futuredefaults"
+    secrets:
+      ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   ####
   # Test Q main and Mandrel 23.1 JDK 21
   ####
