@@ -95,6 +95,7 @@ env:
   QUARKUS_PATH: ${{ github.workspace }}/quarkus
   MANDREL_IT_PATH: ${{ github.workspace }}/mandrel-integration-tests
   MANDREL_PACKAGING_REPO: ${{ github.workspace }}/mandrel-packaging
+  TEMURIN_API_URL_BASE: https://api.adoptium.net/v3/binary
 
 jobs:
   build-vars:
@@ -236,6 +237,35 @@ jobs:
         jq '.include |= map(select(.["os-name"] | startswith("ubuntu")))' native-tests.json | tee -a $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "</details>" >> $GITHUB_STEP_SUMMARY
+  setup-temurin-api-url:
+    name: Set the Temurin API download URL
+    runs-on: ubuntu-slim
+    outputs:
+      api-url: ${{ steps.setup-temurin-api-url.outputs.TEMURIN_API_URL }}
+    steps:
+    - name: Prepare
+      id: setup-temurin-api-url
+      shell: bash
+      run: |
+        echo "${{ inputs.jdk }}"
+        # Expected input for pinned release: 'pinnedrelease:<TEMURIN-GH-RELEASE>`.
+        # For example 'pinnedrelease:jdk-25%2B9-ea-beta'
+        if echo ${{ inputs.jdk }} | grep -q 'pinnedrelease'; then
+          pinned_release_token=$(echo ${{ inputs.jdk }} | cut -d':' -f1)
+          pinned_release=$(echo ${{ inputs.jdk }} | cut -d':' -f2)
+          echo "${pinned_release_token}"
+          echo "${pinned_release}"
+          if [ "${pinned_release_token}_" == "pinnedrelease_" ] && [ "${pinned_release}_" != "_" ]; then
+            TEMURIN_API_URL_TMP="${TEMURIN_API_URL_BASE}/version/${pinned_release}"
+          fi
+        fi
+        if [ "${TEMURIN_API_URL_TMP}_" == "_" ]; then
+          TEMURIN_API_URL="${TEMURIN_API_URL_BASE}/latest/${{ inputs.jdk }}"
+        else
+          TEMURIN_API_URL="${TEMURIN_API_URL_TMP}"
+        fi
+        echo "Setting TEMURIN_API_URL=${TEMURIN_API_URL}"
+        echo "TEMURIN_API_URL=${TEMURIN_API_URL}" >> "$GITHUB_OUTPUT"
 
   build-mandrel:
     name: Mandrel build
@@ -243,6 +273,9 @@ jobs:
     needs:
       - get-test-matrix
       - build-vars
+      - setup-temurin-api-url
+    env:
+      TEMURIN_API_URL: ${{ needs.setup-temurin-api-url.outputs.api-url }}
     if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel' && inputs.builder-image == 'null'
     steps:
     - uses: actions/checkout@v4
@@ -280,8 +313,8 @@ jobs:
           ARCH="aarch64"
         fi
         echo "architecture=$ARCH" >> $GITHUB_OUTPUT
-        curl -sL https://api.adoptium.net/v3/binary/latest/${{ inputs.jdk }}/linux/${ARCH}/jdk/hotspot/normal/eclipse -o jdk.tar.gz
-        curl -sL https://api.adoptium.net/v3/binary/latest/${{ inputs.jdk }}/linux/${ARCH}/staticlibs/hotspot/normal/eclipse -o jdk-static-libs.tar.gz
+        curl -sL ${TEMURIN_API_URL}/linux/${ARCH}/jdk/hotspot/normal/eclipse -o jdk.tar.gz
+        curl -sL ${TEMURIN_API_URL}/linux/${ARCH}/staticlibs/hotspot/normal/eclipse -o jdk-static-libs.tar.gz
         mkdir -p ${JAVA_HOME}
         tar xf jdk.tar.gz -C ${JAVA_HOME} --strip-components=1
         tar xf jdk-static-libs.tar.gz -C ${JAVA_HOME} --strip-components=1
