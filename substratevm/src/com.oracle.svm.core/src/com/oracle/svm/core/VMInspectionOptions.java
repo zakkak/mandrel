@@ -193,7 +193,7 @@ public final class VMInspectionOptions {
      */
     @Fold
     public static boolean hasJfrSupport() {
-        return hasAllOrKeywordMonitoringSupport(MONITORING_JFR_NAME) && !Platform.includedIn(WINDOWS_BASE.class);
+        return hasAllOrKeywordMonitoringSupport(MONITORING_JFR_NAME);
     }
 
     @Fold

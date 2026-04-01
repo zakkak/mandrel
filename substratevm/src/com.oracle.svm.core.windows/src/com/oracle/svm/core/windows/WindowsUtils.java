@@ -130,6 +130,34 @@ public class WindowsUtils {
     }
 
     private static long performanceFrequency = 0L;
+
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public static long readUninterruptibly(HANDLE handle, CCharPointer buffer, UnsignedWord length) {
+        if (handle == INVALID_HANDLE_VALUE()) {
+            return -1;
+        }
+
+        CCharPointer pos = buffer;
+        UnsignedWord bytesRemaining = length;
+        long totalRead = 0;
+        while (bytesRemaining.notEqual(0)) {
+            CIntPointer bytesRead = UnsafeStackValue.get(CIntPointer.class);
+            if (FileAPI.NoTransition.ReadFile(handle, pos, bytesRemaining, bytesRead, Word.nullPointer()) == 0) {
+                return -1;
+            }
+
+            int readCount = bytesRead.read();
+            if (readCount == 0) {
+                break;
+            }
+
+            totalRead += readCount;
+            pos = pos.addressOf(readCount);
+            bytesRemaining = bytesRemaining.subtract(readCount);
+        }
+        return totalRead;
+    }
+
     public static final long NANOSECS_PER_SEC = 1000000000L;
     public static final int NANOSECS_PER_MILLISEC = 1000000;
 
