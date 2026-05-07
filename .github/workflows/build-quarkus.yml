@@ -45,7 +45,7 @@ on:
 env:
   QUARKUS_PATH: quarkus
   COMMON_MAVEN_ARGS: "-e -B --settings .github/mvn-settings.xml --fail-at-end"
-  MANDREL_HOME: ${{ github.workspace }}/mandrelvm
+  MANDREL_HOME: ${{ github.workspace }}/mandrel-home
 
 jobs:
   build-quarkus:
@@ -80,18 +80,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: org-graalvm-artefacts-${{ inputs.artifacts-suffix }}
-        path: .
+        path: ~/.m2/repository/org/graalvm
     - name: Download GraalVM Maven Version
       if: ${{ inputs.build-from-source == true && inputs.builder-image == 'null' && inputs.maven-deploy-local != ''}}
       uses: actions/download-artifact@v4
       with:
         name: mandrel-maven-version-${{ inputs.artifacts-suffix }}
-        path: .
-    - name: Extract GraalVM Maven Repo and GraalVM Maven Version
-      if: ${{ inputs.build-from-source == true && inputs.builder-image == 'null' && inputs.maven-deploy-local != ''}}
-      run: |
-        tar -xzvf graalvm-maven-artefacts.tgz -C ~
-        tar -xzvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME})
+        path: ${{ env.MANDREL_HOME }}
     - name: Build quarkus with local graalvm version
       if: ${{ inputs.build-from-source == true && inputs.builder-image == 'null' && inputs.maven-deploy-local != ''}}
       run: |
@@ -110,19 +105,11 @@ jobs:
         cd ${QUARKUS_PATH}
         ./mvnw ${COMMON_MAVEN_ARGS} -Dquickly
         cd -
-    - name: Tar Maven Repo
-      if: inputs.target-os != 'windows'
-      run: |
-        tar -czvf maven-repo.tgz -C ~ .m2/repository
-    - name: Tar Maven Repo (windows)
-      if: inputs.target-os == 'windows'
-      run: |
-        tar -I 'pigz -9' -cf maven-repo.tgz -C ~ .m2/repository
     - name: Persist Maven Repo
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.target-os }}-maven-repo-${{ inputs.artifacts-suffix }}
-        path: maven-repo.tgz
+        path: ~/.m2/repository
     - name: Delete Local Quarkus Artifacts From Cache
       run: |
         rm -r ~/.m2/repository/io/quarkus

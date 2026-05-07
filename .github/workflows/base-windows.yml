@@ -81,7 +81,7 @@ env:
   JAVA_HOME: ${{ github.workspace }}\openjdk
   GRAALVM_HOME: ${{ github.workspace }}\graalvm-home
   MANDREL_REPO: ${{ github.workspace }}\mandrel
-  MANDREL_HOME: ${{ github.workspace }}\..\mandrelvm
+  MANDREL_HOME: ${{ github.workspace }}\mandrel-home
   MX_PATH: ${{ github.workspace }}\mx
   MX_PYTHON: python
   PYTHONIOENCODING: utf-8
@@ -167,24 +167,23 @@ jobs:
         if(!$?) { Exit $LASTEXITCODE }
         Remove-Item -Recurse $Env:JAVA_HOME
         Move-Item -Path $Env:MANDREL_HOME -Destination $Env:JAVA_HOME
-    - name: Archive JDK
-      shell: bash
-      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel build
       uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.JAVA_HOME }}
     - name: Prepare failure archive (if maven failed)
       if: failure()
       shell: bash
-      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+      run: |
+        mkdir -p test-reports
+        find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
     - name: Upload failure Archive (if maven failed)
       uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: mandrel-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: 'test-reports.tgz'
+        path: test-reports/
 
   build-graal:
     name: GraalVM CE build
@@ -232,24 +231,23 @@ jobs:
         rm -Recurse -Force $Env:JAVA_HOME
         mv ${graalvm-home} $Env:JAVA_HOME
         & $Env:JAVA_HOME\bin\native-image --version
-    - name: Archive JDK
-      shell: bash
-      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist GraalVM CE build
       uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.JAVA_HOME }}
     - name: Prepare failure archive (if maven failed)
       if: failure()
       shell: bash
-      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+      run: |
+        mkdir -p test-reports
+        find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
     - name: Upload failure Archive (if maven failed)
       uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: graal-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: 'test-reports.tgz'
+        path: test-reports/
   
   get-jdk:
     name: Get JDK ${{ inputs.jdk }}
@@ -282,14 +280,11 @@ jobs:
         Move-Item -Path "$Env:temp\graalvm-*" -Destination $Env:JAVA_HOME
         & $Env:JAVA_HOME\bin\gu install native-image
         & $Env:JAVA_HOME\bin\native-image --version
-    - name: Archive JDK
-      shell: bash
-      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel or GraalVM
       uses: actions/upload-artifact@v4
       with:
         name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.JAVA_HOME }}
 
   build-quarkus:
     name: Quarkus build
@@ -342,10 +337,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        shell: bash
-        run: tar -xzf maven-repo.tgz -C ~
+          path: ~/.m2/repository
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.quarkus-repo }}
@@ -366,13 +358,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Mandrel or GraalVM
-        shell: bash
-        run: |
-          mkdir -p "${GRAALVM_HOME}"
-          tar -xzvf jdk.tgz -C graalvm-home --strip-components=1
-          ${GRAALVM_HOME}/bin/java -version
+          path: ${{ env.GRAALVM_HOME }}
       # - name: Reclaim disk space
       #   shell: bash
       #   run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
@@ -411,26 +397,29 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          find . -type d -name '*-reports' \
-            -o -wholename '*/build/reports/tests/functionalTest' \
-            -o -name '*svm_err_*pid*.md' \
-            -o -wholename '*/quarkus/integration-tests/*/target/quarkus.log' | tar czvf test-reports.tgz -T -
+          mkdir -p test-reports
+          find . -type d -name '*-reports' -exec cp -r --parents {} test-reports/ \;
+          find . -wholename '*/build/reports/tests/functionalTest' -exec cp -r --parents {} test-reports/ \;
+          find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
+          find . -wholename '*/quarkus/integration-tests/*/target/quarkus.log' -exec cp --parents {} test-reports/ \;
       - name: Upload failure Archive (if maven failed)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: win-test-reports-native-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'test-reports.tgz'
+          path: test-reports/
       - name: Collect build JSON stats
         if: inputs.build-stats-tag != 'null'
         shell: bash
-        run: find . -name '*runner*.json' | tar czvf build-stats.tgz -T -
+        run: |
+          mkdir -p build-stats
+          find . -name '*runner*.json' -exec cp --parents {} build-stats/ \;
       - name: Upload build JSON stats
         if: inputs.build-stats-tag != 'null'
         uses: actions/upload-artifact@v4
         with:
           name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'build-stats.tgz'
+          path: build-stats/
 
   native-tests-stats-upload:
     name: Upload build stats to collector
@@ -478,10 +467,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        shell: bash
-        run: tar -xzvf maven-repo.tgz -C ~
+          path: ~/.m2/repository
       # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
       - uses: actions/setup-java@v4
         with:
@@ -491,13 +477,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Mandrel or GraalVM
-        shell: bash
-        run: |
-          mkdir -p "${GRAALVM_HOME}"
-          tar -xzvf jdk.tgz -C graalvm-home --strip-components=1
-          ${GRAALVM_HOME}/bin/java -version
+          path: ${{ env.GRAALVM_HOME }}
       - name: Update Docker Client User Agent
         shell: bash
         run: |
@@ -529,13 +509,9 @@ jobs:
           }
           Write-Host "$QUARKUS_VERSION"
           mvn clean verify "-Dquarkus.native.native-image-xmx=5g" "-Dquarkus.version=$QUARKUS_VERSION" -Ptestsuite
-      - name: Prepare failure archive (if maven failed)
-        if: failure()
-        shell: bash
-        run: tar czvf test-reports-mandrel-it.tgz ./testsuite/target/archived-logs/
       - name: Upload failure Archive (if maven failed)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: win-test-reports-mandrel-it-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'test-reports-mandrel-it.tgz'
+          path: ./testsuite/target/archived-logs/

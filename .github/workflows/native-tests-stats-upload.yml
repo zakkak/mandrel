@@ -30,7 +30,7 @@ jobs:
         with:
           pattern: build-stats-*-${{ inputs.artifacts-suffix }}
           path: .
-      - name: Extract and import build stats
+      - name: Import build stats
         env:
           BUILD_STATS_TAG: ${{ inputs.build-stats-tag }}
           UPLOAD_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
@@ -42,7 +42,6 @@ jobs:
           for directory in ./build-stats-*/; do
             echo "Processing $directory"
             cd "$directory"
-            tar -xvf build-stats.tgz
             DIR=./quarkus TAG="${BUILD_STATS_TAG}" TOKEN="${UPLOAD_TOKEN}" URL="${COLLECTOR_URL}" bash ../workflow-mandrel/.github/import_stats.sh
             cd -
           done

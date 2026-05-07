@@ -88,7 +88,7 @@ env:
   JAVA_HOME: ${{ github.workspace }}/openjdk
   GRAALVM_HOME: ${{ github.workspace }}/graalvm-home
   MANDREL_REPO: ${{ github.workspace }}/mandrel
-  MANDREL_HOME: ${{ github.workspace }}/../mandrelvm
+  MANDREL_HOME: ${{ github.workspace }}/mandrel-home
   MX_PATH: ${{ github.workspace }}/mx
   MX_PYTHON: python
   PYTHONIOENCODING: utf-8
@@ -213,44 +213,38 @@ jobs:
           --mx-home ${MX_PATH} \
           --mandrel-repo ${MANDREL_REPO} \
           --mandrel-home ${MANDREL_HOME} \
-          --archive-suffix tar.gz \
           "${{needs.build-vars.outputs.maven-deploy-local}}"
         ${MANDREL_HOME}/bin/native-image --version
-        mv mandrel-java*-linux-${{ steps.get-jdk.outputs.architecture }}*.tar.gz ${{ github.workspace }}/jdk.tgz
-        if [ "$MVN_LOCAL" != "" ]
-        then
-          rm -rf graalvm-maven-artefacts.tgz && tar -czvf graalvm-maven-artefacts.tgz -C ~ .m2/repository/org/graalvm
-          mv graalvm-maven-artefacts.tgz ${{ github.workspace }}
-          rm -rf graalvm-version.tgz && tar -czvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})/.maven-version
-          mv graalvm-version.tgz ${{ github.workspace }}
-        fi
     - name: Persist Mandrel build
       uses: actions/upload-artifact@v4
       with:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.MANDREL_HOME }}/
     - name: Persist local maven repository
       if: needs.build-vars.outputs.maven-deploy-local != ''
       uses: actions/upload-artifact@v4
       with:
         name: org-graalvm-artefacts-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: graalvm-maven-artefacts.tgz
+        path: ~/.m2/repository/org/graalvm/
     - name: Persist GraalVM maven version
       if: needs.build-vars.outputs.maven-deploy-local != ''
       uses: actions/upload-artifact@v4
       with:
         name: mandrel-maven-version-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: graalvm-version.tgz
+        path: ${{ env.MANDREL_HOME }}/.maven-version
+        include-hidden-files: true
     - name: Prepare failure archive (if maven failed)
       if: failure()
       shell: bash
-      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+      run: |
+        mkdir -p test-reports
+        find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
     - name: Upload failure Archive (if maven failed)
       uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: mandrel-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: 'test-reports.tgz'
+        path: test-reports/
 
   build-graal:
     name: GraalVM CE build
@@ -305,44 +299,41 @@ jobs:
           cd ../
           # Deploy maven artefacts to local repository
           ${MX_PATH}/mx --primary-suite-path sdk maven-deploy --suppress-javadoc 2>&1 | tee maven_deploy.log
-          rm -rf graalvm-maven-artefacts.tgz && tar -czvf graalvm-maven-artefacts.tgz -C ~ .m2/repository/org/graalvm
-          mv graalvm-maven-artefacts.tgz ${{ github.workspace }}
           # Derive Maven version from 'mx graalvm-version' output
           MAVEN_VERS=$(${MX_PATH}/mx --primary-suite-path substratevm graalvm-version 2>/dev/null | sed 's|-dev|-SNAPSHOT|g')
           echo "GraalVM maven version is: ${MAVEN_VERS}"
           echo ${MAVEN_VERS} > ${MANDREL_HOME}/.maven-version
-          rm -rf graalvm-version.tgz && tar -czvf graalvm-version.tgz -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})/.maven-version
-          mv graalvm-version.tgz ${{ github.workspace }}
         fi
-    - name: Tar GraalVM
-      run: tar czvf jdk.tgz  -C $(dirname ${MANDREL_HOME}) $(basename ${MANDREL_HOME})
     - name: Persist GraalVM build
       uses: actions/upload-artifact@v4
       with:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.MANDREL_HOME }}
     - name: Persist local maven repository
       if: needs.build-vars.outputs.maven-deploy-local != ''
       uses: actions/upload-artifact@v4
       with:
         name: org-graalvm-artefacts-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: graalvm-maven-artefacts.tgz
+        path: ~/.m2/repository/org/graalvm
     - name: Persist GraalVM maven version
       if: needs.build-vars.outputs.maven-deploy-local != ''
       uses: actions/upload-artifact@v4
       with:
         name: mandrel-maven-version-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: graalvm-version.tgz
+        path: ${{ env.MANDREL_HOME }}/.maven-version
+        include-hidden-files: true
     - name: Prepare failure archive (if maven failed)
       if: failure()
       shell: bash
-      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+      run: |
+        mkdir -p test-reports
+        find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
     - name: Upload failure Archive (if maven failed)
       uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: graal-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: 'test-reports.tgz'
+        path: test-reports/
 
   get-jdk:
     name: Get JDK ${{ inputs.jdk }}
@@ -369,27 +360,26 @@ jobs:
       run: |
         VERSION=${{ inputs.mandrel-version }}
         echo "**Mandrel version:** [$VERSION](${GITHUB_SERVER_URL}/graalvm/mandrel/releases/tag/$VERSION)" >> $GITHUB_STEP_SUMMARY
+        mkdir -p ${JAVA_HOME}
         curl \
           -sL ${GITHUB_SERVER_URL}/graalvm/mandrel/releases/download/${VERSION}/mandrel-java$(echo ${{ inputs.jdk }} | cut -d / -f 1)-linux-${{ steps.arch.outputs.architecture }}-${VERSION##mandrel-}.tar.gz \
-          -o jdk.tgz
+          | tar xz -C ${JAVA_HOME} --strip-components=1
     - name: Get GraalVM CE ${{ inputs.mandrel-version }}
       if: needs.build-vars.outputs.distribution == 'graalvm'
       run: |
         VERSION=${{ inputs.mandrel-version }}
         echo "**GraalVM version:** [$VERSION](${GITHUB_SERVER_URL}/oracle/graal/releases/tag/$VERSION)" >> $GITHUB_STEP_SUMMARY
+        mkdir -p ${JAVA_HOME}
         curl \
           -sL ${GITHUB_SERVER_URL}/graalvm/graalvm-ce-builds/releases/download/${VERSION}/graalvm-ce-java$(echo ${{ inputs.jdk }} | cut -d / -f 1)-linux-${{ steps.arch.outputs.architecture }}-${VERSION##vm-}.tar.gz \
-          -o graalvm.tgz
-        mkdir -p ${JAVA_HOME}
-        tar xzvf graalvm.tgz -C ${JAVA_HOME} --strip-components=1
+          | tar xz -C ${JAVA_HOME} --strip-components=1
         ${JAVA_HOME}/bin/gu install native-image
         ${JAVA_HOME}/bin/native-image --version
-        tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
     - name: Persist Mandrel or GraalVM
       uses: actions/upload-artifact@v4
       with:
         name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-        path: jdk.tgz
+        path: ${{ env.JAVA_HOME }}
 
   build-quarkus:
     name: Quarkus build
@@ -439,10 +429,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: linux-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        shell: bash
-        run: tar -xzvf maven-repo.tgz -C ~
+          path: ~/.m2/repository
       # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
       - uses: actions/setup-java@v4
         with:
@@ -453,13 +440,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Mandrel or GraalVM
-        if: inputs.builder-image == 'null'
-        shell: bash
-        run: |
-          mkdir -p ${GRAALVM_HOME}
-          tar -xzvf jdk.tgz -C ${GRAALVM_HOME} --strip-components=1
+          path: ${{ env.GRAALVM_HOME }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.quarkus-repo }}
@@ -534,26 +515,29 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          find . -type d -name '*-reports' \
-            -o -wholename '*/build/reports/tests/functionalTest' \
-            -o -name '*svm_err_*pid*.md' \
-            -o -wholename '*/quarkus/integration-tests/*/target/quarkus.log' | tar czvf test-reports.tgz -T -
+          mkdir -p test-reports
+          find . -type d -name '*-reports' -exec cp -r --parents {} test-reports/ \;
+          find . -wholename '*/build/reports/tests/functionalTest' -exec cp -r --parents {} test-reports/ \;
+          find . -name '*svm_err_*pid*.md' -exec cp --parents {} test-reports/ \;
+          find . -wholename '*/quarkus/integration-tests/*/target/quarkus.log' -exec cp --parents {} test-reports/ \;
       - name: Upload failure Archive (if maven failed)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-reports-native-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'test-reports.tgz'
+          path: test-reports/
       - name: Collect build JSON stats
         if: ${{ always() && inputs.build-stats-tag != 'null' }}
         shell: bash
-        run: find . -name '*runner*.json' | tar czvf build-stats.tgz -T -
+        run: |
+          mkdir -p build-stats
+          find . -name '*runner*.json' -exec cp --parents {} build-stats/ \;
       - name: Upload build JSON stats
         if: ${{ always() && inputs.build-stats-tag != 'null' }}
         uses: actions/upload-artifact@v4
         with:
           name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'build-stats.tgz'
+          path: build-stats/
 
   native-tests-stats-upload:
     name: Upload build stats to collector
@@ -602,9 +586,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: linux-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Maven Repo
-        run: tar -xzvf maven-repo.tgz -C ~
+          path: ~/.m2/repository
       # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
       - uses: actions/setup-java@v4
         with:
@@ -615,13 +597,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: .
-      - name: Extract Mandrel or GraalVM
-        if: inputs.builder-image == 'null'
-        shell: bash
-        run: |
-          mkdir -p ${GRAALVM_HOME}
-          tar -xzvf jdk.tgz -C ${GRAALVM_HOME} --strip-components=1
+          path: ${{ env.GRAALVM_HOME }}
       - name: Update Docker Client User Agent
         run: |
           if [ -f ~/.docker/config.json ]; then
@@ -659,12 +635,9 @@ jobs:
               -Dquarkus.native.builder-image=${{ inputs.builder-image }} \
               -Ptestsuite-builder-image
           fi
-      - name: Prepare failure archive (if maven failed)
-        if: failure()
-        run: tar czvf test-reports-mandrel-it.tgz ${MANDREL_IT_PATH}/testsuite/target/archived-logs/
       - name: Upload failure Archive (if maven failed)
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-reports-mandrel-it-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
-          path: 'test-reports-mandrel-it.tgz'
+          path: ${{ env.MANDREL_IT_PATH }}/testsuite/target/archived-logs/
