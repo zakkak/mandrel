@@ -131,10 +131,10 @@ class Report implements Runnable {
 			// of the job, and we don't need to group the jobs by issue number, since
 			// the structure of the workflow is simpler.
 			PagedIterable<GHWorkflowJob> listJobs = workflowRun.listJobs();
-			// Ensure we parse "Set distribution" jobs first as they are the ones containing the github issue numbers
+			// Ensure we parse "Resolve Version and Generate Matrix" jobs first as they are the ones containing the github issue numbers
 			listJobs.forEach(job -> {
-						// Each configuration starts with the Set distribution job
-						if (job.getName().contains("Set distribution")) {
+						// Each configuration starts with the Resolve Version and Generate Matrix job
+						if (job.getName().contains("Resolve Version and Generate Matrix")) {
 							processLogs(github, job, issues, mandrelITIssues, this::processITJobs, "issue-number", "issue-repo");
 						}
 					});
