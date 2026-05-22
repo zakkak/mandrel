@@ -25,6 +25,7 @@
 package com.oracle.svm.core.windows;
 
 import static com.oracle.svm.core.annotate.RecomputeFieldValue.Kind.Custom;
+import static com.oracle.svm.core.Uninterruptible.CALLED_FROM_UNINTERRUPTIBLE_CODE;
 
 import java.io.FileDescriptor;
 
@@ -95,23 +96,22 @@ public class WindowsUtils {
      * it can be used, e.g., in low-level logging routines.
      */
     public static boolean writeBytes(int handle, CCharPointer bytes, UnsignedWord length) {
+        if (handle == INVALID_HANDLE_VALUE()) {
+            return false;
+        }
+
         CCharPointer curBuf = bytes;
         UnsignedWord curLen = length;
         while (curLen.notEqual(0)) {
-            if (handle == -1) {
-                return false;
-            }
-
+            int writeSize = bytesToTransfer(curLen);
             CIntPointer bytesWritten = UnsafeStackValue.get(CIntPointer.class);
-
-            int ret = FileAPI.WriteFile(handle, curBuf, curLen, bytesWritten, Word.nullPointer());
-
+            int ret = FileAPI.WriteFile(handle, curBuf, writeSize, bytesWritten, Word.nullPointer());
             if (ret == 0) {
                 return false;
             }
 
             int writtenCount = bytesWritten.read();
-            if (curLen.notEqual(writtenCount)) {
+            if (writtenCount <= 0 || writtenCount > writeSize) {
                 return false;
             }
 
@@ -137,25 +137,16 @@ public class WindowsUtils {
             return -1;
         }
 
-        CCharPointer pos = buffer;
-        UnsignedWord bytesRemaining = length;
-        long totalRead = 0;
-        while (bytesRemaining.notEqual(0)) {
-            CIntPointer bytesRead = UnsafeStackValue.get(CIntPointer.class);
-            if (FileAPI.NoTransition.ReadFile(handle, pos, bytesRemaining, bytesRead, Word.nullPointer()) == 0) {
-                return -1;
-            }
-
-            int readCount = bytesRead.read();
-            if (readCount == 0) {
-                break;
-            }
-
-            totalRead += readCount;
-            pos = pos.addressOf(readCount);
-            bytesRemaining = bytesRemaining.subtract(readCount);
+        CIntPointer bytesRead = UnsafeStackValue.get(CIntPointer.class);
+        if (FileAPI.NoTransition.ReadFile(handle, buffer, bytesToTransfer(length), bytesRead, Word.nullPointer()) == 0) {
+            return -1;
         }
-        return totalRead;
+        return bytesRead.read();
+    }
+
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    private static int bytesToTransfer(UnsignedWord length) {
+        return length.aboveThan(Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) length.rawValue();
     }
 
     public static final long NANOSECS_PER_SEC = 1000000000L;

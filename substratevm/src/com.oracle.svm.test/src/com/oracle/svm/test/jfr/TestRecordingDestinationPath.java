@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2026, 2026, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2026, 2026, IBM Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,13 +25,38 @@
 
 package com.oracle.svm.test.jfr;
 
-import org.graalvm.nativeimage.Platform;
-import static org.junit.Assume.assumeTrue;
-import org.junit.BeforeClass;
+import static org.junit.Assert.assertEquals;
 
-public abstract class JfrEmergencyDumpTest extends JfrRecordingTest {
-    @BeforeClass
-    public static void checkNotWindows() {
-        assumeTrue("skipping emergency dump tests on Windows", !Platform.includedIn(Platform.WINDOWS.class));
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import org.junit.Test;
+
+import com.oracle.svm.test.jfr.events.ClassEvent;
+
+import jdk.jfr.Recording;
+import jdk.jfr.consumer.RecordedEvent;
+
+public class TestRecordingDestinationPath extends JfrRecordingTest {
+    @Test
+    public void testNonAsciiDestinationPath() throws Throwable {
+        String[] events = new String[]{"com.jfr.Class"};
+        Path path = Files.createTempFile("TestRecordingDestinationPath_Gr\u00fc\u00dfe_\u4f60\u597d_", ".jfr");
+        try {
+            Recording recording = startRecording(events, getDefaultConfiguration(), null, path);
+
+            ClassEvent event = new ClassEvent();
+            event.clazz = TestRecordingDestinationPath.class;
+            event.commit();
+
+            stopRecording(recording, TestRecordingDestinationPath::validateEvents);
+        } finally {
+            Files.deleteIfExists(path);
+        }
+    }
+
+    private static void validateEvents(List<RecordedEvent> events) {
+        assertEquals(1, events.size());
     }
 }

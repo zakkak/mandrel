@@ -57,8 +57,9 @@ import jdk.jfr.internal.JVMSupport;
 import jdk.jfr.internal.jfc.JFC;
 
 /**
- * Provides basic JFR support. As this support is both platform-dependent and JDK-specific, the
- * current support is limited to Linux & MacOS.
+ * Provides basic JFR support. The core event infrastructure is shared across platforms, while some
+ * integration points such as out-of-process control and platform events remain platform-dependent
+ * and JDK-specific.
  *
  * There are two different kinds of JFR events:
  * <ul>
@@ -119,6 +120,11 @@ public class JfrFeature implements InternalFeature {
     }
 
     public static boolean isInConfiguration(boolean allowPrinting) {
+        boolean systemSupported = VMInspectionOptions.hasJfrPlatformSupport();
+        if (HOSTED_ENABLED && !systemSupported) {
+            throw UserError.abort("FlightRecorder cannot be used to profile the image generator on this platform. " +
+                            "The image generator can only be profiled on platforms where FlightRecorder is also supported at run time.");
+        }
         boolean runtimeEnabled = VMInspectionOptions.hasJfrSupport();
         if (HOSTED_ENABLED && !runtimeEnabled) {
             if (allowPrinting) {
@@ -128,7 +134,7 @@ public class JfrFeature implements InternalFeature {
             runtimeEnabled = true;
         }
 
-        return runtimeEnabled;
+        return runtimeEnabled && systemSupported;
     }
 
     /**
