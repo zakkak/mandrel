@@ -41,6 +41,7 @@ import org.graalvm.word.UnsignedWord;
 import com.oracle.svm.core.Uninterruptible;
 import com.oracle.svm.core.feature.AutomaticallyRegisteredFeature;
 import com.oracle.svm.core.feature.InternalFeature;
+import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
 import com.oracle.svm.core.memory.UntrackedNullableNativeMemory;
 import com.oracle.svm.core.os.AbstractRawFileOperationSupport;
 import com.oracle.svm.core.os.AbstractRawFileOperationSupport.RawFileOperationSupportHolder;

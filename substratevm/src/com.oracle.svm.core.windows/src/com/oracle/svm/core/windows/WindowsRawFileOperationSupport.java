@@ -25,7 +25,7 @@
  */
 package com.oracle.svm.core.windows;
 
-import static com.oracle.svm.shared.Uninterruptible.CALLED_FROM_UNINTERRUPTIBLE_CODE;
+import static com.oracle.svm.core.Uninterruptible.CALLED_FROM_UNINTERRUPTIBLE_CODE;
 
 import java.io.File;
 import java.nio.ByteOrder;
@@ -38,9 +38,8 @@ import org.graalvm.nativeimage.c.type.CLongPointer;
 import org.graalvm.nativeimage.impl.InternalPlatform.WINDOWS_BASE;
 import org.graalvm.word.Pointer;
 import org.graalvm.word.UnsignedWord;
-import org.graalvm.word.impl.Word;
 
-import com.oracle.svm.shared.feature.AutomaticallyRegisteredFeature;
+import com.oracle.svm.core.feature.AutomaticallyRegisteredFeature;
 import com.oracle.svm.core.feature.InternalFeature;
 import com.oracle.svm.core.graal.stackvalue.UnsafeStackValue;
 import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
@@ -53,11 +52,10 @@ import com.oracle.svm.core.windows.headers.FileAPI;
 import com.oracle.svm.core.windows.headers.WinBase;
 import com.oracle.svm.core.windows.headers.WinBase.HANDLE;
 import com.oracle.svm.core.windows.headers.WindowsLibC.WCharPointer;
-import com.oracle.svm.shared.singletons.traits.BuiltinTraits.BuildtimeAccessOnly;
-import com.oracle.svm.shared.singletons.traits.BuiltinTraits.SingleLayer;
-import com.oracle.svm.shared.singletons.traits.SingletonTraits;
-import com.oracle.svm.shared.Uninterruptible;
-import com.oracle.svm.shared.util.VMError;
+import com.oracle.svm.core.Uninterruptible;
+import com.oracle.svm.core.util.VMError;
+
+import jdk.graal.compiler.word.Word;
 
 /**
  * Raw file operations for Windows. File paths are stored as null-terminated UTF-16 strings so that
@@ -258,7 +256,6 @@ public class WindowsRawFileOperationSupport extends AbstractRawFileOperationSupp
     }
 }
 
-@SingletonTraits(access = BuildtimeAccessOnly.class, layeredCallbacks = SingleLayer.class)
 @AutomaticallyRegisteredFeature
 class WindowsRawFileOperationFeature implements InternalFeature {
     @Override

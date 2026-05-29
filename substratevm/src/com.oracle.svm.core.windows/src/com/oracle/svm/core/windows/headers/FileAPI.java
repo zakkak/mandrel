@@ -121,11 +121,5 @@ public class FileAPI {
 
         @CFunction(transition = NO_TRANSITION)
         public static native int WriteFile(HANDLE hFile, CCharPointer lpBuffer, int nNumberOfBytesToWrite, CIntPointer lpNumberOfBytesWritten, PointerBase lpOverlapped);
-
-        @CFunction(transition = NO_TRANSITION)
-        public static native int FlushFileBuffers(HANDLE hFile);
-
-        @CFunction(transition = NO_TRANSITION)
-        public static native HANDLE GetStdHandle(int stdHandle);
     }
 }

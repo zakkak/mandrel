@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.graalvm.nativeimage.ImageSingletons;
-import org.graalvm.nativeimage.Platform;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.impl.RuntimeClassInitializationSupport;
 
@@ -133,7 +132,6 @@ public class JfrFeature implements InternalFeature {
             }
             runtimeEnabled = true;
         }
-
         return runtimeEnabled && systemSupported;
     }
 

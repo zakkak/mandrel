@@ -35,7 +35,6 @@ import org.graalvm.word.UnsignedWord;
 import org.graalvm.word.WordBase;
 
 import com.oracle.svm.core.Uninterruptible;
-import com.oracle.svm.core.memory.UntrackedNullableNativeMemory;
 import com.oracle.svm.core.os.AbstractRawFileOperationSupport.RawFileOperationSupportHolder;
 
 import jdk.graal.compiler.api.replacements.Fold;
@@ -76,8 +75,8 @@ public interface RawFileOperationSupport {
     }
 
     /**
-     * Tries to allocate a platform-dependent raw string for the given path. The returned value needs
-     * to be freed manually once it is no longer needed.
+     * Tries to allocate a platform-dependent raw string for the given path. The returned value
+     * needs to be freed manually once it is no longer needed.
      *
      * @return If the allocation is successful, a non-null value is returned.
      */
