@@ -618,7 +618,7 @@ public class NativeImage {
             // after the split in GR-43819 (#7171)
             if (libJvmciDir != null) {
                 result.addAll(getJars(libJvmciDir, "enterprise-graal"));
-                result.addAll(getJars(libJvmciDir, "word", "collections", "nativeimage", "nativeimage-libgraal"));
+                result.addAll(getJars(libJvmciDir, "word", "collections", "nativeimage", "nativeimage-libgraal", "graal-options"));
             }
             result.addAll(createTruffleBuilderModulePath());
             result.addAll(getJars(rootDir.resolve(Paths.get("lib", "svm", "builder"))));
