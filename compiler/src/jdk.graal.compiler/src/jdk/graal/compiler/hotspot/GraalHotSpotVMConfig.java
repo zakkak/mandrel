@@ -685,7 +685,7 @@ public class GraalHotSpotVMConfig extends GraalHotSpotVMConfigAccess {
     public final long validateObject = getAddress("JVMCIRuntime::validate_object");
 
     public final long testDeoptimizeCallInt = getAddress("JVMCIRuntime::test_deoptimize_call_int");
-    public final long testDeoptimizeCallerOfCaller = getAddress("JVMCIRuntime::test_deoptimize_caller_of_caller");
+    public final long testDeoptimizeCallerOfCaller = getAddress("JVMCIRuntime::test_deoptimize_caller_of_caller", 0L, false);
 
     public final long registerFinalizerAddress = getAddress("SharedRuntime::register_finalizer");
     public final long exceptionHandlerForReturnAddressAddress = getAddress("SharedRuntime::exception_handler_for_return_address");
