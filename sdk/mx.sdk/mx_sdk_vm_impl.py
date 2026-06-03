@@ -2021,6 +2021,11 @@ class GraalVmBashLauncherBuildTask(GraalVmNativeImageBuildTask):
                     extra_jvm_args = ' '.join([extra_jvm_args, r'--upgrade-module-path "%location%\..\..\jvmci\graal.jar"'])
                 else:
                     extra_jvm_args = ' '.join([extra_jvm_args, '--upgrade-module-path "${location}/../../jvmci/graal.jar"'])
+                patches = mx.jdk_module_patches()
+                if patches:
+                    patch_args = ['--add-modules=' + ','.join(module for module, _ in patches)]
+                    patch_args += ['--patch-module=' + module + '=' + patch_path for module, patch_path in patches]
+                    extra_jvm_args = ' '.join([extra_jvm_args] + patch_args)
             return extra_jvm_args
 
         def _get_option_vars():
@@ -2193,6 +2198,12 @@ class GraalVmSVMNativeImageBuildTask(GraalVmNativeImageBuildTask):
         ] + svm_experimental_options(experimental_build_args) + [
             '--macro:' + GraalVmNativeProperties.macro_name(self.subject.native_image_config), # last to allow overrides
         ]
+        if not _jlink_libraries():
+            patches = mx.jdk_module_patches()
+            if patches:
+                build_args += ['-J' + arg for arg in
+                    ['--add-modules=' + ','.join(module for module, _ in patches)] +
+                    ['--patch-module=' + module + '=' + patch_path for module, patch_path in patches]]
         return build_args
 
 
