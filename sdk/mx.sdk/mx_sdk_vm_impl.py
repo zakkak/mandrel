@@ -448,7 +448,7 @@ class BaseGraalVmLayoutDistribution(mx.LayoutDistribution, metaclass=ABCMeta):
                     _add(layout, d, s)
 
             jimage_exclusion_list = ['lib/jvm.cfg']
-            if not stage1:
+            if not stage1 and _jlink_libraries():
                 for lc, c in [(lc, c) for c in self.components for lc in c.library_configs if lc.add_to_module]:
                     assert isinstance(c, (mx_sdk.GraalVmJreComponent, mx_sdk.GraalVmJdkComponent)), f"'{c.name}' is not a GraalVmJreComponent nor a GraalVmJdkComponent but defines a library config ('{lc.destination}') with 'add_to_module' attribute"
                     assert not lc.add_to_module.endswith('.jmod'), f"Library config '{lc.destination}' of component '{c.name}' has an invalid 'add_to_module' attribute: '{lc.add_to_module}' cannot end with '.jmod'"
@@ -2236,7 +2236,8 @@ class JmodModifier(mx.Project):
 
     def getArchivableResults(self, use_relpath=True, single=False):
         out = self.output_file()
-        yield out, basename(out)
+        if exists(out):
+            yield out, basename(out)
 
     def output_file(self):
         return join(self.get_output_base(), self.jmod_file)
@@ -2257,6 +2258,8 @@ class JmodModifierBuildTask(mx.ProjectBuildTask, metaclass=ABCMeta):
         return mx.TimeStampFile(self.subject.output_file())
 
     def needsBuild(self, newestInput):
+        if not _jlink_libraries():
+            return False, 'jmod modification is not needed when jlinking is disabled'
         sup = super().needsBuild(newestInput)
         if sup[0]:
             return sup
@@ -2268,6 +2271,9 @@ class JmodModifierBuildTask(mx.ProjectBuildTask, metaclass=ABCMeta):
         return False, None
 
     def build(self):
+        if not _jlink_libraries():
+            mx.logv(f"Skipping {self.subject.name}: jmod modification is not needed when jlinking is disabled")
+            return False
         mx_util.ensure_dir_exists(dirname(self.subject.output_file()))
         graalvm_jimage_home = self.subject.jimage_project.output_directory()
 
@@ -2804,12 +2810,13 @@ def mx_register_dynamic_suite_constituents(register_project, register_distributi
         )
         register_project(final_jimage_project)
 
-        for jmod_file, library_projects in modified_jmods.items():
-            register_project(JmodModifier(
-                jmod_file=jmod_file,
-                library_projects=library_projects,
-                jimage_project=final_jimage_project,
-        ))
+        if _jlink_libraries():
+            for jmod_file, library_projects in modified_jmods.items():
+                register_project(JmodModifier(
+                    jmod_file=jmod_file,
+                    library_projects=library_projects,
+                    jimage_project=final_jimage_project,
+            ))
 
     # Trivial distributions to trigger the build of the final GraalVM distribution
     for label, dists in main_dists.items():
