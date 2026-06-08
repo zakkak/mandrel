@@ -669,6 +669,21 @@ public class NativeImage {
         }
 
         /**
+         * @return --patch-module and --add-modules JVM args to propagate to the image builder
+         */
+        public List<String> getBuilderPatchModuleArgs() {
+            List<String> result = new ArrayList<>();
+            for (String arg : java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+                if (arg.startsWith("--patch-module=")) {
+                    result.add(arg);
+                    String moduleName = arg.substring("--patch-module=".length()).split("=")[0];
+                    result.add("--add-modules=" + moduleName);
+                }
+            }
+            return result;
+        }
+
+        /**
          * @return classpath for image (the classes the user wants to build an image from)
          */
         public List<Path> getImageClasspath() {
@@ -1074,6 +1089,22 @@ public class NativeImage {
                         .collect(Collectors.joining(File.pathSeparator));
         if (!upgradeModulePath.isEmpty()) {
             addImageBuilderJavaArgs(Arrays.asList("--upgrade-module-path", upgradeModulePath));
+        }
+        for (String patchArg : config.getBuilderPatchModuleArgs()) {
+            if (patchArg.startsWith("--patch-module=")) {
+                String moduleName = patchArg.substring("--patch-module=".length()).split("=")[0];
+                String prefix = "--patch-module=" + moduleName + "=";
+                boolean alreadyPresent = imageBuilderJavaArgs.stream().anyMatch(a -> a.startsWith(prefix)) ||
+                        customJavaArgs.stream().anyMatch(a -> a.startsWith(prefix));
+                if (!alreadyPresent) {
+                    addImageBuilderJavaArgs(patchArg);
+                }
+            } else if (patchArg.startsWith("--add-modules=")) {
+                boolean alreadyPresent = imageBuilderJavaArgs.contains(patchArg) || customJavaArgs.contains(patchArg);
+                if (!alreadyPresent) {
+                    addImageBuilderJavaArgs(patchArg);
+                }
+            }
         }
 
         completeOptionArgs();
