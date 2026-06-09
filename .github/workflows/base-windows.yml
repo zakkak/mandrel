@@ -1,0 +1,547 @@
+name: Windows Mandrel-Quarkus tests
+
+on:
+  workflow_call:
+    inputs:
+      quarkus-version:
+        type: string
+        description: 'Quarkus version to test (branch, tag, commit, or "latest")'
+        # "latest" is replaced by the latest release available in maven
+        default: "999-SNAPSHOT"
+      quarkus-repo:
+        type: string
+        description: 'The Quarkus repository to be used'
+        default: 'quarkusio/quarkus'
+      mandrel-version:
+        type: string
+        description: 'Mandrel version to test (branch, tag, or commit)'
+        default: "graal/master"
+      mandrel-repo:
+        type: string
+        description: 'The Mandrel/Graal repository to be used'
+        default: 'graalvm/mandrel'
+      mandrel-packaging-version:
+        type: string
+        description: 'Mandrel packaging version to test (branch, tag, or commit)'
+        default: "master"
+      mandrel-packaging-repo:
+        type: string
+        description: 'Mandrel packaging repository to be used'
+        default: "graalvm/mandrel-packaging"
+      build-type:
+        type: string
+        description: 'Build distribution (Mandrel/GraalVM) from source or grab a release'
+        default: "mandrel-source"
+      jdk:
+        type: string
+        description: 'OpenJDK to use. One of <feature-version>/ga, <feature-version>/ea, e.g. 17/ga or 17/ea (/ga and /ea suffixes are only relevant when building from source)'
+        default: "17/ga"
+      # Builder image can't be tested on Windows due to https://github.com/actions/virtual-environments/issues/1143
+      # builder-image:
+      #   description: 'The builder image to use instead of a release or building from source (e.g. quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21)'
+      #   default: "null"
+      issue-number:
+        type: string
+        description: 'The issue number to report results to'
+        default: "null"
+      issue-repo:
+        type: string
+        description: 'The repository to report results to'
+        default: "graalvm/mandrel"
+      mandrel-it-issue-number:
+        type: string
+        description: 'The issue number to report results to mandrel-integration-tests'
+        default: "null"
+      build-stats-tag:
+        type: string
+        description: 'The tag to use for build stats upload of native tests (e.g. 22.3.0-dev-jdk17-mytest-patch-before)'
+        default: "null"
+      quarkus-additional-build-args-append:
+        type: string
+        description: 'Additional arguments to append to the quarkus native build command'
+        default: ''
+    secrets:
+      ISSUE_BOT_TOKEN:
+        description: 'A token used to report results in GH issues'
+        required: false
+      UPLOAD_COLLECTOR_TOKEN:
+        description: 'A token used to report build statistics to a collector'
+        required: false
+
+env:
+  # Workaround testsuite locale issue
+  LANG: en_US.UTF-8
+  DB_USER: hibernate_orm_test
+  DB_PASSWORD: hibernate_orm_test
+  DB_NAME: hibernate_orm_test
+  COMMON_MAVEN_ARGS: "-e -B --settings .github/mvn-settings.xml --fail-at-end"
+  NATIVE_TEST_MAVEN_OPTS: "-Dtest-containers -Dstart-containers -DfailIfNoTests=false -Dquarkus.native.native-image-xmx=13g -Dnative -Dnative.surefire.skip -Dformat.skip -Dno-descriptor-tests -DskipDocs"
+  QUARKUS_NATIVE_ADDITIONAL_BUILD_ARGS_APPEND: ${{ inputs.quarkus-additional-build-args-append }}
+  MX_GIT_CACHE: refcache
+  JAVA_HOME: ${{ github.workspace }}\openjdk
+  GRAALVM_HOME: ${{ github.workspace }}\graalvm-home
+  MANDREL_REPO: ${{ github.workspace }}\mandrel
+  MANDREL_HOME: ${{ github.workspace }}\..\mandrelvm
+  MX_PATH: ${{ github.workspace }}\mx
+  MX_PYTHON: python
+  PYTHONIOENCODING: utf-8
+  QUARKUS_PATH: ${{ github.workspace }}\quarkus
+  MANDREL_PACKAGING_REPO: ${{ github.workspace }}\mandrel-packaging
+
+jobs:
+  build-vars:
+    name: Compute build configuration
+    uses: ./.github/workflows/compute-build-config.yml
+    with:
+      build-type: ${{ inputs.build-type }}
+
+  get-test-matrix:
+    name: Resolve Quarkus version and test matrix
+    uses: ./.github/workflows/resolve-quarkus-version.yml
+    with:
+      quarkus-version: ${{ inputs.quarkus-version }}
+      quarkus-repo: ${{ inputs.quarkus-repo }}
+      workflow-inputs: ${{ toJson(inputs) }}
+      os-filter: "windows"
+
+  build-mandrel:
+    name: Mandrel build
+    runs-on: windows-2022
+    needs:
+      - get-test-matrix
+      - build-vars
+    if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'mandrel'
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        repository: ${{ inputs.mandrel-repo }}
+        fetch-depth: 1
+        ref: ${{ inputs.mandrel-version }}
+        path: ${{ env.MANDREL_REPO }}
+    - name: Set up Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: '3.8'
+    - name: Checkout MX
+      run: |
+        VERSION=$(jq -r .mx_version ${MANDREL_REPO}/common.json)
+        git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} mx
+        ./mx/mx --version
+      shell: bash
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        repository: ${{ inputs.mandrel-packaging-repo }}
+        ref: ${{ inputs.mandrel-packaging-version }}
+        path: ${{ env.MANDREL_PACKAGING_REPO }}
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.mx
+        key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
+        restore-keys: ${{ runner.os }}-mx-
+    - name: Get OpenJDK with static libs
+      run: |
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile("https://api.adoptium.net/v3/binary/latest/${{ inputs.jdk }}/windows/x64/jdk/hotspot/normal/eclipse", "$Env:temp\jdk.zip")
+        Expand-Archive "$Env:temp\jdk.zip" -DestinationPath "$Env:temp"
+        Move-Item -Path "$Env:temp\jdk-*" -Destination $Env:JAVA_HOME
+        $wc.DownloadFile("https://api.adoptium.net/v3/binary/latest/${{ inputs.jdk }}/windows/x64/staticlibs/hotspot/normal/eclipse", "$Env:temp\jdk-staticlibs.zip")
+        Expand-Archive "$Env:temp\jdk-staticlibs.zip" -DestinationPath "$Env:temp"
+        Move-Item -Path "$Env:temp\jdk-*\lib\static" -Destination $Env:JAVA_HOME\lib\
+        Remove-Item -Recurse "$Env:temp\jdk-*"
+        & $Env:JAVA_HOME\bin\java -version
+    - name: Build Mandrel
+      run: |
+        cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
+        Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
+          if ($_ -match "^(.*?)=(.*)$") {
+            Set-Content "Env:\$($matches[1])" $matches[2]
+          }
+        }
+        Set-Location -Path $Env:MANDREL_PACKAGING_REPO
+        & $Env:JAVA_HOME\bin\java -ea build.java `
+          --mx-home $Env:MX_PATH `
+          --mandrel-repo $Env:MANDREL_REPO `
+          --mandrel-home $Env:MANDREL_HOME
+        if(!$?) { Exit $LASTEXITCODE }
+        & $Env:MANDREL_HOME\bin\native-image --version
+        if(!$?) { Exit $LASTEXITCODE }
+        Remove-Item -Recurse $Env:JAVA_HOME
+        Move-Item -Path $Env:MANDREL_HOME -Destination $Env:JAVA_HOME
+    - name: Archive JDK
+      shell: bash
+      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
+    - name: Persist Mandrel build
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: jdk.tgz
+    - name: Prepare failure archive (if maven failed)
+      if: failure()
+      shell: bash
+      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+    - name: Upload failure Archive (if maven failed)
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      if: failure()
+      with:
+        name: mandrel-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: 'test-reports.tgz'
+
+  build-graal:
+    name: GraalVM CE build
+    runs-on: windows-2022
+    needs:
+      - get-test-matrix
+      - build-vars
+    if: fromJson(needs.build-vars.outputs.build-from-source) == true && needs.build-vars.outputs.distribution == 'graalvm'
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        repository: ${{ inputs.mandrel-repo }}
+        fetch-depth: 1
+        ref: ${{ inputs.mandrel-version }}
+        path: graal
+    - name: Set up Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: '3.8'
+    - name: Checkout MX
+      run: |
+        VERSION=$(jq -r .mx_version graal/common.json)
+        git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} mx
+        ./mx/mx --version
+      shell: bash
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.mx
+        key: ${{ runner.os }}-mx-${{ hashFiles('**/suite.py') }}
+        restore-keys: ${{ runner.os }}-mx-
+    - name: Build graalvm native-image
+      run: |
+        cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
+        Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
+          if ($_ -match "^(.*?)=(.*)$") {
+            Set-Content "Env:\$($matches[1])" $matches[2]
+          }
+        }
+        Set-Location graal\substratevm
+        mkdir -p "$Env:temp\jdk-dl"
+        & $Env:MX_PATH\mx.cmd --java-home= fetch-jdk --java-distribution labsjdk-ce-$(("${{ inputs.jdk }}" -split "/")[0]) --to "$Env:temp\jdk-dl" --alias $Env:JAVA_HOME
+        & $Env:JAVA_HOME\bin\java --version
+        & $Env:MX_PATH\mx.cmd --native=native-image,lib:jvmcicompiler,lib:native-image-agent,lib:native-image-diagnostics-agent --components="Native Image,LibGraal,svml" build
+        ${graalvm-home} = @(& $Env:MX_PATH\mx.cmd --native=native-image,lib:jvmcicompiler,lib:native-image-agent,lib:native-image-diagnostics-agent --components="Native Image,LibGraal,svml" graalvm-home)
+        rm -Recurse -Force $Env:JAVA_HOME
+        mv ${graalvm-home} $Env:JAVA_HOME
+        & $Env:JAVA_HOME\bin\native-image --version
+    - name: Archive JDK
+      shell: bash
+      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
+    - name: Persist GraalVM CE build
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: jdk.tgz
+    - name: Prepare failure archive (if maven failed)
+      if: failure()
+      shell: bash
+      run: find . -name '*svm_err_*pid*.md' | tar czvf test-reports.tgz -T -
+    - name: Upload failure Archive (if maven failed)
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      if: failure()
+      with:
+        name: graal-reports-native-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: 'test-reports.tgz'
+  
+  get-jdk:
+    name: Get JDK ${{ inputs.jdk }}
+    runs-on: windows-2022
+    needs:
+      - get-test-matrix
+      - build-vars
+    if: fromJson(needs.build-vars.outputs.build-from-source) == false
+    steps:
+    - name: Get Mandrel ${{ inputs.mandrel-version }}
+      if: needs.build-vars.outputs.distribution == 'mandrel'
+      run: |
+        $VERSION="${{ inputs.mandrel-version }}"
+        $VERSION_SHORT=@($VERSION -replace 'mandrel-')
+        $wc = New-Object System.Net.WebClient
+        $url="$Env:GITHUB_SERVER_URL/graalvm/mandrel/releases/download/${VERSION}/mandrel-java$(("${{ inputs.jdk }}" -split "/")[0])-windows-amd64-${VERSION_SHORT}.zip"
+        $wc.DownloadFile($($url), "mandrel.zip")
+        Expand-Archive "mandrel.zip" -DestinationPath "$Env:temp"
+        Move-Item -Path "$Env:temp\mandrel-*" -Destination $Env:JAVA_HOME
+        & $Env:JAVA_HOME\bin\native-image --version
+    - name: Get GraalVM CE ${{ inputs.mandrel-version }}
+      if: needs.build-vars.outputs.distribution == 'graalvm'
+      run: |
+        $VERSION="${{ inputs.mandrel-version }}"
+        $VERSION_SHORT=@($VERSION -replace 'vm-')
+        $wc = New-Object System.Net.WebClient
+        $url="$Env:GITHUB_SERVER_URL/graalvm/graalvm-ce-builds/releases/download/${VERSION}/graalvm-ce-java$(("${{ inputs.jdk }}" -split "/")[0])-windows-amd64-${VERSION_SHORT}.zip"
+        $wc.DownloadFile($($url), "graalvm.zip")
+        Expand-Archive "graalvm.zip" -DestinationPath "$Env:temp"
+        Move-Item -Path "$Env:temp\graalvm-*" -Destination $Env:JAVA_HOME
+        & $Env:JAVA_HOME\bin\gu install native-image
+        & $Env:JAVA_HOME\bin\native-image --version
+    - name: Archive JDK
+      shell: bash
+      run: tar czvf jdk.tgz -C $(dirname ${JAVA_HOME}) $(basename ${JAVA_HOME})
+    - name: Persist Mandrel or GraalVM
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+        path: jdk.tgz
+
+  build-quarkus:
+    name: Quarkus build
+    needs:
+      - get-test-matrix
+      - build-mandrel
+      - build-graal
+      - build-vars
+    if: always() && (needs.build-graal.result == 'success' || needs.build-mandrel.result == 'success' || fromJson(needs.build-vars.outputs.build-from-source) == false)
+    strategy:
+      fail-fast: false
+    uses: ./.github/workflows/build-quarkus.yml
+    with:
+      artifacts-suffix: ${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+      build-from-source: ${{ fromJson(needs.build-vars.outputs.build-from-source) }}
+      target-os: 'windows'
+      quarkus-repo: ${{ inputs.quarkus-repo }}
+      quarkus-version: ${{ needs.get-test-matrix.outputs.quarkus-version }}
+      quarkus-sha: ${{ needs.get-test-matrix.outputs.quarkus-sha }}
+      use-snapshot: ${{ fromJson(needs.get-test-matrix.outputs.use-snapshot) }}
+
+  native-tests:
+    name: Q IT ${{ matrix.category }}
+    needs:
+      - build-quarkus
+      - build-mandrel
+      - build-graal
+      - get-jdk
+      - get-test-matrix
+    if: always() && needs.build-quarkus.result == 'success'
+    runs-on: windows-2022
+    env:
+      # leave more space for the actual native compilation and execution
+      MAVEN_OPTS: -Xmx1g
+    #   USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
+    # Ignore the following YAML Schema error
+    timeout-minutes: ${{matrix.timeout}}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.get-test-matrix.outputs.tests-matrix) }}
+    steps:
+      - name: Support longpaths on Windows
+        if: startsWith(matrix.os-name, 'windows')
+        run: git config --global core.longpaths true
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: startsWith(matrix.os-name, 'windows')
+        with:
+          repository: graalvm/mandrel
+          fetch-depth: 1
+          path: workflow-mandrel
+      - name: Download Maven Repo
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: .
+      - name: Extract Maven Repo
+        shell: bash
+        run: tar -xzf maven-repo.tgz -C ~
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ inputs.quarkus-repo }}
+          fetch-depth: 1
+          ref: ${{ needs.get-test-matrix.outputs.quarkus-sha }}
+          path: ${{ env.QUARKUS_PATH }}
+      # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download Mandrel or GraalVM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: .
+      - name: Extract Mandrel or GraalVM
+        shell: bash
+        run: |
+          mkdir -p "${GRAALVM_HOME}"
+          tar -xzvf jdk.tgz -C graalvm-home --strip-components=1
+          ${GRAALVM_HOME}/bin/java -version
+      # - name: Reclaim disk space
+      #   shell: bash
+      #   run: ${QUARKUS_PATH}/.github/ci-prerequisites.sh
+      # We do this so we can get better analytics for the downloaded version of the build images
+      - name: Update Docker Client User Agent
+        shell: bash
+        run: |
+          if [ -f ~/.docker/config.json ]; then
+            cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json.new
+            mv ~/.docker/config.json.new ~/.docker/config.json
+          fi
+      - name: Build Gradle plugins for snapshots
+        if: ${{ fromJson(needs.get-test-matrix.outputs.use-snapshot) == true && contains(matrix.test-modules, 'gradle') }}
+        shell: bash
+        run: |
+          cd ${QUARKUS_PATH}
+          # Build Gradle plugins that are not included in snapshots to avoid Gradle repository lookup
+          echo "Building Gradle plugins to local Maven repository"
+          ./mvnw ${COMMON_MAVEN_ARGS} -Dquickly -pl devtools/gradle,devtools/gradle/gradle-application-plugin,devtools/gradle/gradle-extension-plugin -am install
+          cd -
+      - name: Build with Maven
+        env:
+          TEST_MODULES: ${{matrix.test-modules}}
+          CATEGORY: ${{matrix.category}}
+        run: |
+          cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
+          Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
+            if ($_ -match "^(.*?)=(.*)$") {
+              Set-Content "Env:\$($matches[1])" $matches[2]
+            }
+          }
+          cd $Env:QUARKUS_PATH
+          Write-Host "$Env:GRAALVM_HOME"
+          if (Test-Path "$Env:GRAALVM_HOME/bin/native-image" -PathType leaf) {
+            & "$Env:GRAALVM_HOME/bin/native-image" --version
+          }
+          $opts=@()
+          -split $Env:NATIVE_TEST_MAVEN_OPTS | foreach { $opts += "`"$_`"" }
+          #if ( "${{ inputs.builder-image }}" -eq "null" ) {
+          mvn -f integration-tests -pl "$Env:TEST_MODULES" -am -amd "-Dquarkus.native.container-build=false" $opts install
+          #} else {
+          #  mvn -pl $do_modules "-Dquarkus.native.container-build=true" "-Dquarkus.native.builder-image=${{ inputs.builder-image }}" $opts package
+          #}
+      - name: Prepare failure archive (if maven failed)
+        if: failure()
+        shell: bash
+        run: |
+          find . -type d -name '*-reports' \
+            -o -wholename '*/build/reports/tests/functionalTest' \
+            -o -name '*svm_err_*pid*.md' \
+            -o -wholename '*/quarkus/integration-tests/*/target/quarkus.log' | tar czvf test-reports.tgz -T -
+      - name: Upload failure Archive (if maven failed)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: win-test-reports-native-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: 'test-reports.tgz'
+      - name: Collect build JSON stats
+        if: inputs.build-stats-tag != 'null'
+        shell: bash
+        run: find . -name '*runner*.json' | tar czvf build-stats.tgz -T -
+      - name: Upload build JSON stats
+        if: inputs.build-stats-tag != 'null'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-stats-${{matrix.category}}-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: 'build-stats.tgz'
+
+  native-tests-stats-upload:
+    name: Upload build stats to collector
+    if: always() && inputs.build-stats-tag != 'null' && github.event_name != 'pull_request' && needs.native-tests.result != 'skipped' && needs.native-tests.result != 'cancelled'
+    needs:
+      - native-tests
+      - get-test-matrix
+    uses: ./.github/workflows/native-tests-stats-upload.yml
+    with:
+      artifacts-suffix: ${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+      build-stats-tag: ${{ inputs.build-stats-tag }}
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
+
+  mandrel-integration-tests:
+    name: Q Mandrel IT
+    if: always() && needs.build-quarkus.result == 'success'
+    needs:
+      - build-vars
+      - build-mandrel
+      - get-jdk
+      - build-quarkus
+      - get-test-matrix
+    runs-on: windows-2022
+    env:
+      # leave more space for the actual native compilation and execution
+      MAVEN_OPTS: -Xmx1g
+      # Don't perform performance checks since GH runners are not that stable
+      FAIL_ON_PERF_REGRESSION: false
+      # USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: graalvm/mandrel
+          fetch-depth: 1
+          path: workflow-mandrel
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Karm/mandrel-integration-tests
+          fetch-depth: 1
+      - name: Download Maven Repo
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-maven-repo-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: .
+      - name: Extract Maven Repo
+        shell: bash
+        run: tar -xzvf maven-repo.tgz -C ~
+      # Use Java 17 for Quarkus as it doesn't work with Java 21 yet
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download Mandrel or GraalVM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: win-jdk-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: .
+      - name: Extract Mandrel or GraalVM
+        shell: bash
+        run: |
+          mkdir -p "${GRAALVM_HOME}"
+          tar -xzvf jdk.tgz -C graalvm-home --strip-components=1
+          ${GRAALVM_HOME}/bin/java -version
+      - name: Update Docker Client User Agent
+        shell: bash
+        run: |
+          if [ -f ~/.docker/config.json ]; then
+            cat <<< $(jq '.HttpHeaders += {"User-Agent": "Mandrel-CI-Docker-Client"}' ~/.docker/config.json) > ~/.docker/config.json.new
+            mv ~/.docker/config.json.new ~/.docker/config.json
+          fi
+      - name: Build with Maven
+        run: |
+          cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars64.txt"
+          Get-Content "$Env:temp\vcvars64.txt" | Foreach-Object {
+            if ($_ -match "^(.*?)=(.*)$") {
+              Set-Content "Env:\$($matches[1])" $matches[2]
+            }
+          }
+          $Env:PATH="$Env:GRAALVM_HOME\bin;$Env:PATH"
+          if (Test-Path "$Env:GRAALVM_HOME\bin\native-image.cmd" -PathType leaf) {
+            & "$Env:GRAALVM_HOME\bin\native-image" --version
+          } else {
+            Write-Host "Cannot find native-image tool. Quitting..."
+            exit 1
+          }
+          $QUARKUS_VERSION="${{ needs.get-test-matrix.outputs.quarkus-version }}"
+          # Don't use SNAPSHOT version for release tags
+          if ($QUARKUS_VERSION -match "^[0-9]+\.[0-9]+$") {
+            $QUARKUS_VERSION="$QUARKUS_VERSION.999-SNAPSHOT"
+          } elseif (! ($QUARKUS_VERSION -match "^.*\.(Final|CR|Alpha|Beta)[0-9]?$")) {
+            $QUARKUS_VERSION="999-SNAPSHOT"
+          }
+          Write-Host "$QUARKUS_VERSION"
+          mvn clean verify "-Dquarkus.native.native-image-xmx=5g" "-Dquarkus.version=$QUARKUS_VERSION" -Ptestsuite
+      - name: Prepare failure archive (if maven failed)
+        if: failure()
+        shell: bash
+        run: tar czvf test-reports-mandrel-it.tgz ./testsuite/target/archived-logs/
+      - name: Upload failure Archive (if maven failed)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: win-test-reports-mandrel-it-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
+          path: 'test-reports-mandrel-it.tgz'

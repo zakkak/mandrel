@@ -1,0 +1,48 @@
+name: Native tests stats upload
+
+on:
+  workflow_call:
+    inputs:
+      artifacts-suffix:
+        type: string
+        description: 'The stats artifact suffix to download'
+        default: "null"
+      build-stats-tag:
+        type: string
+        description: 'The tag to use for build stats upload of native tests (e.g. 22.3.0-dev-jdk17-mytest-patch-before)'
+        default: "null"
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN:
+        description: 'A token used to report build statistics to a collector'
+        required: false
+
+jobs:
+  native-tests-stats-upload:
+    name: Upload build stats to collector
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: graalvm/mandrel
+          fetch-depth: 1
+          path: workflow-mandrel
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: build-stats-*-${{ inputs.artifacts-suffix }}
+          path: .
+      - name: Extract and import build stats
+        env:
+          BUILD_STATS_TAG: ${{ inputs.build-stats-tag }}
+          UPLOAD_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
+          COLLECTOR_URL: https://collector.foci.life/api/v1/image-stats
+        shell: bash
+        run: |
+          ls ./build-stats-*/
+          echo "Tag for stat upload is going to be: '${BUILD_STATS_TAG}'"
+          for directory in ./build-stats-*/; do
+            echo "Processing $directory"
+            cd "$directory"
+            tar -xvf build-stats.tgz
+            DIR=./quarkus TAG="${BUILD_STATS_TAG}" TOKEN="${UPLOAD_TOKEN}" URL="${COLLECTOR_URL}" bash ../workflow-mandrel/.github/import_stats.sh
+            cd -
+          done
