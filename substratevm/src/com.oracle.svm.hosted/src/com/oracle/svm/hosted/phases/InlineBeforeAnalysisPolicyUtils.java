@@ -179,7 +179,17 @@ public class InlineBeforeAnalysisPolicyUtils {
     private final Set<ResolvedJavaMethod> explicitMethodHandleIntrinisificationRoots = GuestAccess.elements().abstractMemorySegmentGetSetMethods;
 
     public boolean isMethodHandleIntrinsificationRoot(ResolvedJavaMethod method) {
+        /*
+         * Hidden/generated LambdaForm classes may not expose their class file bytes through normal
+         * class loader resources. When running with a Java-side JVMCI fallback for raw annotation
+         * bytes, @LambdaForm.Compiled can therefore be unavailable even though HotSpot marks these
+         * methods as compiled LambdaForms. Treat the generated hidden LambdaForm holders as
+         * intrinsification roots as well.
+         */
+        String declaringClassName = method.getDeclaringClass().getName();
+        boolean hiddenCompiledLambdaForm = declaringClassName.startsWith("Ljava/lang/invoke/LambdaForm$MH") || declaringClassName.startsWith("Ljava/lang/invoke/LambdaForm$DMH");
         return AnnotationUtil.isAnnotationPresent(method, COMPILED_LAMBDA_FORM_ANNOTATION) ||
+                        hiddenCompiledLambdaForm ||
                         explicitMethodHandleIntrinisificationRoots.contains(OriginalMethodProvider.getOriginalMethod(method));
     }
 
