@@ -165,9 +165,7 @@ jobs:
         python-version: '3.8'
     - name: Checkout MX
       run: |
-        VERSION=$(jq -r .mx_version ${MANDREL_REPO}/common.json)
-        echo "**MX version:** [$VERSION](${GITHUB_SERVER_URL}/graalvm/mx/tree/$VERSION)" >> $GITHUB_STEP_SUMMARY
-        git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} ${MX_PATH}
+        git clone ${GITHUB_SERVER_URL}/zakkak/mx --depth 1 --branch 2026-06-09-jvmci-compatibility-patch ${MX_PATH}
         ./mx/mx --version
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
@@ -199,6 +197,21 @@ jobs:
         echo ${JAVA_HOME}
         ${JAVA_HOME}/bin/java --version
         echo "**Java version:** $(grep JAVA_RUNTIME_VERSION ${JAVA_HOME}/release | cut -d '=' -f 2)" >> $GITHUB_STEP_SUMMARY
+    - name: Checkout zakkak/labs-openjdk (JVMCI patch)
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        repository: zakkak/labs-openjdk
+        ref: 2026-06-09-jvmci-compatibility-patch
+        path: labsjdk-src
+    - name: Build patchedJVMCI.jar
+      run: |
+        cd labsjdk-src
+        ${JAVA_HOME}/bin/javac -d jvmci-pr-classes \
+          --add-exports java.base/jdk.internal.misc=jdk.internal.vm.ci \
+          --add-exports java.base/jdk.internal.reflect=jdk.internal.vm.ci \
+          $(find src/jdk.internal.vm.ci/share/classes -type f -name '*.java')
+        cd jvmci-pr-classes
+        ${JAVA_HOME}/bin/jar -cvf ${GITHUB_WORKSPACE}/patchedJVMCI.jar jdk/
     - name: Build Mandrel
       run: |
         MANDREL_COMMIT=$(cd ${MANDREL_REPO} && git rev-parse HEAD)
@@ -214,6 +227,7 @@ jobs:
           --mandrel-repo ${MANDREL_REPO} \
           --mandrel-home ${MANDREL_HOME} \
           --archive-suffix tar.gz \
+          --custom-jvmci-jar ${GITHUB_WORKSPACE}/patchedJVMCI.jar \
           "${{needs.build-vars.outputs.maven-deploy-local}}"
         ${MANDREL_HOME}/bin/native-image --version
         mv mandrel-java*-linux-${{ steps.get-jdk.outputs.architecture }}*.tar.gz ${{ github.workspace }}/jdk.tgz
@@ -272,9 +286,7 @@ jobs:
         python-version: '3.8'
     - name: Checkout MX
       run: |
-        VERSION=$(jq -r .mx_version graal/common.json)
-        echo "**MX version:** [$VERSION](${GITHUB_SERVER_URL}/graalvm/mx/tree/$VERSION)" >> $GITHUB_STEP_SUMMARY
-        git clone ${GITHUB_SERVER_URL}/graalvm/mx --depth 1 --branch ${VERSION} ${MX_PATH}
+        git clone ${GITHUB_SERVER_URL}/zakkak/mx --depth 1 --branch 2026-06-09-jvmci-compatibility-patch ${MX_PATH}
         ./mx/mx --version
     - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -363,7 +375,7 @@ jobs:
         fi
         echo "architecture=$ARCH" >> $GITHUB_OUTPUT
         echo "Architecture: $ARCH"
-    
+
     - name: Get Mandrel ${{ inputs.mandrel-version }}
       if: needs.build-vars.outputs.distribution == 'mandrel'
       run: |
@@ -689,4 +701,3 @@ jobs:
         with:
           name: test-reports-mandrel-it-${{ needs.get-test-matrix.outputs.artifacts-suffix }}
           path: 'test-reports-mandrel-it.tgz'
-

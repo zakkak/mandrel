@@ -16,11 +16,11 @@ on:
       graalvm-version:
         type: string
         description: 'Mandrel version to test `<repo>:<version>` (branch, tag, or commit)'
-        default: "graalvm/mandrel:graal/master"
+        default: "zakkak/mandrel:2026-06-09-jvmci-compatibility-patch"
       mandrel-packaging-version:
         type: string
         description: 'Mandrel packaging version to test `<repo>:<version>` (branch, tag, or commit)'
-        default: "graalvm/mandrel-packaging:master"
+        default: "zakkak/mandrel-packaging:2026-06-09-jvmci-compatibility-patch"
       build-type:
         type: choice
         description: 'Build distribution (graal/mandrel) from source or use released binaries, and control if maven should deploy locally'
@@ -35,7 +35,7 @@ on:
       jdk:
         type: choice
         description: 'OpenJDK to use. One of <feature-version>/ga, <feature-version>/ea, e.g. 17/ga or 17/ea (/ga and /ea suffixes are only relevant when building from source)'
-        default: "21/ga"
+        default: "25/ga"
         options:
           - "21/ga"
           - "21/ea"
