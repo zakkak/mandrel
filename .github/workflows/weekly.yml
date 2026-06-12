@@ -108,6 +108,21 @@ jobs:
       ISSUE_BOT_TOKEN: ${{ secrets.MANDREL_BOT_TOKEN }}
       UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
   ####
+  # Test Q main and Graal master with --future-defaults=all
+  ####
+  q-main-graal-master-future-defaults:
+    name: "Q main G master --future-defaults=all"
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    uses: ./.github/workflows/base.yml
+    with:
+      mandrel-version: "graal/master"
+      build-type: "graal-source-nolocalmvn"
+      jdk: "latest/ea"
+      quarkus-additional-build-args-append: "--future-defaults=all"
+      build-stats-tag: "gha-linux-graal-qmain-gmaster-jdklatest-futuredefaults"
+    secrets:
+      UPLOAD_COLLECTOR_TOKEN: ${{ secrets.UPLOAD_COLLECTOR_TOKEN }}
+  ####
   # Test Q main and Mandrel 23.1 JDK 21
   ####
   q-main-mandrel-23_1:
